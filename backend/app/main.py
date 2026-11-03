@@ -1,22 +1,28 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes.health import router as health_router
+from app.core.config import get_settings
+
+settings = get_settings()
+
+# Explicitly ensure Vite dev server (http://localhost:5173) and production Cloud Run
+# domains (*.run.app + any configured CORS_ORIGINS) are permitted.
+ALLOWED_ORIGINS = list(dict.fromkeys(["http://localhost:5173", *settings.cors_origins]))
 
 app = FastAPI(
-    title="CanopyCrew API",
-    version="0.1.0",
-    description="Backend API for the CanopyCrew urban greening platform."
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Backend API for the CanopyCrew urban greening platform.",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=settings.cors_origin_regex,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def root():
-    return {
-        "message": "Welcome to CanopyCrew API 🌱"
-    }
-
-
-@app.get("/health")
-def health():
-    return {
-        "status": "healthy",
-        "app": "CanopyCrew API"
-    }
+app.include_router(health_router)

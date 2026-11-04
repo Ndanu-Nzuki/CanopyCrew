@@ -50,7 +50,7 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
 - **Cross-Lane Unblocks:** Unblocked `@Laurine` with live deterministic REST endpoints for UI integration and validated plan payloads for NVIDIA NIM care narratives, and `@Barbara` with verified species cost and canopy projections.
 - **Verification:** `pytest -v` (`backend/tests/test_endpoints.py` verifying all 3 sites, 10 native species, exotic/invasive genus ban, `<= 5.0 m` wire-safety enforcement on `site-a-sidewalk-strip`, and `POST /api/v1/volunteer-plan` math).
 
-### [2026-11-04] — docs(docs): add system architecture and data schema deliverables (`docs/docs-architecture-schema`)
+### [2026-11-04] — PR #5: docs(docs): add system architecture and data schema deliverables (`docs/docs-architecture-schema`)
 - **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering)
 - **Changes Delivered:**
   - Created `docs/ARCHITECTURE.md` detailing the Python `3.12.7` / FastAPI backend layout, deterministic Python (`recommender.py`) vs. NVIDIA NIM (`backend/app/agent/`) responsibility split, CORS rules, and `$0` Google Cloud Run (`--min-instances 0 --max-instances 2`) + Cloud Firestore (`<= 1 GiB`) deployment architecture.

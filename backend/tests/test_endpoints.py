@@ -42,6 +42,31 @@ def test_species_seed_catalog_integrity() -> None:
         assert not any(banned in sci_lower for banned in forbidden_genera)
 
 
+def test_get_species_returns_all_ten() -> None:
+    response = client.get("/api/v1/species")
+    assert response.status_code == 200
+
+    species_list = response.json()
+    assert len(species_list) == 10
+
+    forbidden_genera = ("ficus", "ligustrum", "eucalyptus")
+    for sp in species_list:
+        sci_lower = sp["botanical"]["scientific_name"].lower()
+        assert not any(banned in sci_lower for banned in forbidden_genera)
+
+
+def test_get_single_species_and_404() -> None:
+    ok_response = client.get("/api/v1/species/eugenia-uniflora")
+    assert ok_response.status_code == 200
+    pitanga = ok_response.json()
+    assert pitanga["botanical"]["scientific_name"] == "Eugenia uniflora"
+    assert pitanga["physical_profile"]["sidewalk_wire_safe"] is True
+    assert pitanga["physical_profile"]["mature_height_meters"] <= 5.0
+
+    not_found = client.get("/api/v1/species/ficus-microcarpa")
+    assert not_found.status_code == 404
+
+
 def test_recommendations_enforces_wire_safety_for_site_a() -> None:
     response = client.get(
         "/api/v1/recommendations",

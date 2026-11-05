@@ -61,3 +61,14 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Security (`@Idris`):** Documents `SecretStr` isolation for `NVIDIA_API_KEY`, Google Secret Manager runtime injection, and CORS restrictions for `docs/SECURITY.md`.
 - **Verification:** Verified GFM tables, Mermaid (`flowchart LR` & `erDiagram`) syntax, schema field parity against `backend/app/schemas/plan.py` and `backend/tests/test_endpoints.py`, and pre-commit secret/budget guardrails.
 
+### [2026-11-05] — PR: feat(backend): add native species catalog endpoints (`feature/backend-species-endpoint`)
+- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering)
+- **Changes Delivered:**
+  - Implemented `GET /api/v1/species` and `GET /api/v1/species/{species_id}` in `backend/app/api/routes/species.py` backed by `load_species()` and new `get_species_by_id()` / `SpeciesNotFoundError` handling in `backend/app/services/recommender.py`.
+  - Added automated unit tests (`test_get_species_returns_all_ten` and `test_get_single_species_and_404`) in `backend/tests/test_endpoints.py` verifying full 10-species catalog integrity and 404 responses.
+  - Updated `docs/DATA_SCHEMA.md` and `docs/ARCHITECTURE.md` with REST contracts, route trees, and component interaction flows.
+- **Cross-Lane Unblocks:**
+  - **Frontend (`@Laurine`):** Unblocks `PlantCatalogue` to fetch all 10 verified native species in a single GET request, eliminating the need to query 3 separate site recommendation endpoints and deduplicate in client JavaScript.
+  - **Security (`@Idris`):** Exposes purely read-only endpoints returning static Pydantic-validated botanical catalogs (`ConfigDict(extra="forbid")`) with zero database queries and no credential requirements.
+- **Verification:** `pytest -v` (`18 passed` across health, site archetypes, wire safety, and species catalog endpoints).
+

@@ -57,7 +57,7 @@ flowchart LR
         NIM["NVIDIA NIM API<br/>Volunteer Care Narrative"]
     end
 
-    UI -->|"GET /api/v1/sites<br/>GET /api/v1/recommendations<br/>POST /api/v1/volunteer-plan"| CR
+    UI -->|"GET /api/v1/sites & /species<br/>GET /api/v1/recommendations<br/>POST /api/v1/volunteer-plan"| CR
     CR --> DET
     DET --> DATA
     DET -.->|"Optional Plan Persistence"| FS
@@ -97,6 +97,7 @@ backend/
 │   ├── api/routes/
 │   │   ├── health.py            # GET /, GET /health, GET /api/v1/health
 │   │   ├── sites.py             # GET /api/v1/sites, GET /api/v1/sites/{site_id}
+│   │   ├── species.py           # GET /api/v1/species, GET /api/v1/species/{species_id}
 │   │   └── plans.py             # GET /api/v1/recommendations, POST /api/v1/volunteer-plan
 │   ├── core/
 │   │   └── config.py            # pydantic-settings env loader (SecretStr for NVIDIA_API_KEY)
@@ -136,6 +137,8 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 | `GET` | `/api/v1/health` | `health.health` | `200` | Versioned health check alias for frontend API clients. |
 | `GET` | `/api/v1/sites` | `sites.list_sites` | `200` | Returns all 3 verified São Paulo `SiteArchetype` objects. |
 | `GET` | `/api/v1/sites/{site_id}` | `sites.retrieve_site` | `200`, `404` | Returns a single `SiteArchetype` by `site_id` or `404` if unknown. |
+| `GET` | `/api/v1/species` | `species.list_species` | `200` | Returns all 10 verified native Atlantic Forest `NativeSpecies` objects. |
+| `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404` | Returns a single `NativeSpecies` by `species_id` or `404` if unknown. |
 | `GET` | `/api/v1/recommendations?site_id=...` | `plans.recommend_species` | `200`, `404`, `422` | Deterministically filters the 10-species catalog for municipal wire safety and site suitability. |
 | `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), and volunteer care tasks. |
 

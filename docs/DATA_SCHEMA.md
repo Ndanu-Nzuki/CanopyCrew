@@ -163,7 +163,17 @@ erDiagram
 }
 ```
 
-### 4.3 Deterministic Species Recommendations — `GET /api/v1/recommendations`
+### 4.3 Native Species Catalog — `GET /api/v1/species` & `GET /api/v1/species/{species_id}`
+- **`GET /api/v1/species` (`200 OK`):** Returns `list[NativeSpecies]` (all 10 verified native *Mata Atlântica* species in a single request for catalogue views).
+- **`GET /api/v1/species/eugenia-uniflora` (`200 OK`):** Returns a single `NativeSpecies` object.
+- **Error (`404 Not Found`):**
+```json
+{
+  "detail": "Unknown native species 'ficus-microcarpa'."
+}
+```
+
+### 4.4 Deterministic Species Recommendations — `GET /api/v1/recommendations`
 - **Query Parameter:** `site_id` (required `string`, `min_length=1`).
 - **Deterministic Filtering Rules (`recommender.get_recommendations`):**
   1. Looks up `site_id` (`404` if not one of the 3 verified archetypes).
@@ -174,7 +184,7 @@ erDiagram
   - `site-b-sunny-lot` (**9**): `eugenia-uniflora`, `schinus-terebinthifolia`, `pleroma-mutabile`, `cecropia-pachystachya`, `calliandra-tweediei`, `campomanesia-phaea`, `psidium-cattleianum`, `bromelia-antiacantha`, `salvia-splendens`
   - `site-c-shaded-courtyard` (**5**): `eugenia-uniflora`, `pleroma-mutabile`, `campomanesia-phaea`, `myrcia-glabra`, `salvia-splendens`
 
-### 4.4 Volunteer Plan Calculation — `POST /api/v1/volunteer-plan`
+### 4.5 Volunteer Plan Calculation — `POST /api/v1/volunteer-plan`
 
 #### Request Body (`VolunteerPlanRequest`)
 | Field | Type | Validation | Description |

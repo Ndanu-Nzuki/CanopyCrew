@@ -20,6 +20,10 @@ class SiteNotFoundError(LookupError):
     """Raised when a requested site_id is not among the 3 verified São Paulo archetypes."""
 
 
+class SpeciesNotFoundError(LookupError):
+    """Raised when a requested species_id is not in the verified native Atlantic Forest catalog."""
+
+
 class InvalidSpeciesSelectionError(ValueError):
     """Raised when selected species are unknown or violate site/wire-safety rules."""
 
@@ -46,6 +50,14 @@ def get_site_by_id(site_id: str) -> SiteArchetype:
         if site.site_id == site_id:
             return site
     raise SiteNotFoundError(f"Unknown site archetype '{site_id}'.")
+
+
+def get_species_by_id(species_id: str) -> NativeSpecies:
+    """Return a single verified NativeSpecies or raise SpeciesNotFoundError."""
+    for species in load_species():
+        if species.species_id == species_id:
+            return species
+    raise SpeciesNotFoundError(f"Unknown native species '{species_id}'.")
 
 
 def _satisfies_wire_safety(site: SiteArchetype, species: NativeSpecies) -> bool:

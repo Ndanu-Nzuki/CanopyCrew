@@ -12,7 +12,7 @@ function SiteCard({ site, index }) {
   ][index % 3]
   const light = site.sunlight_exposure.replaceAll("_", " ")
 
-  return <article className="site-card"><div className="site-image-wrap"><img src={image} alt={`${site.archetype_label} planting site`} /><span className="site-number">0{index + 1}</span><span className="distance"><Icon name="pin" size={15} /> São Paulo</span></div><div className="site-body"><p className="site-location"><Icon name="pin" size={16} /> {site.archetype_label}</p><h3>{site.name}</h3><p className="site-description">{site.description}</p><div className="tags"><span>{site.typical_dimensions}</span><span>{light}</span></div><div className="card-link"><span>{site.ecological_goals.length} ecological goals</span><Icon name="arrow" size={18} /></div></div></article>
+  return <a className="site-card" href={`#site/${encodeURIComponent(site.site_id)}`}><div className="site-image-wrap"><img src={image} alt={`${site.archetype_label} planting site`} /><span className="site-number">0{index + 1}</span><span className="distance"><Icon name="pin" size={15} /> São Paulo</span></div><div className="site-body"><p className="site-location"><Icon name="pin" size={16} /> {site.archetype_label}</p><h3>{site.name}</h3><p className="site-description">{site.description}</p><div className="tags"><span>{site.typical_dimensions}</span><span>{light}</span></div><div className="card-link"><span>View site details · {site.ecological_goals.length} ecological goals</span><Icon name="arrow" size={18} /></div></div></a>
 }
 
 export default function Discover({ sites, status }) {

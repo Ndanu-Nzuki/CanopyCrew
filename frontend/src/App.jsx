@@ -1,122 +1,73 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react"
+import About from "./components/about"
+import Discover from "./components/discover"
+import Footer from "./components/Footer"
+import Hero from "./components/hero"
+import Navbar from "./components/navbar"
+import PlantCatalogue from "./components/plantcatalogue"
 
-function App() {
-  const [count, setCount] = useState(0)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+
+async function getJson(path) {
+  const response = await fetch(`${API_BASE_URL}${path}`)
+  if (!response.ok) throw new Error(`Request failed (${response.status})`)
+  return response.json()
+}
+
+export default function App() {
+  const [sites, setSites] = useState([])
+  const [plants, setPlants] = useState([])
+  const [sitesStatus, setSitesStatus] = useState("loading")
+  const [plantsStatus, setPlantsStatus] = useState("loading")
+
+  useEffect(() => {
+    let active = true
+
+    getJson("/api/v1/sites")
+      .then(async (siteData) => {
+        if (!active) return
+        setSites(siteData)
+        setSitesStatus("ready")
+
+        try {
+          const recommendationLists = await Promise.all(
+            siteData.map((site) =>
+              getJson(`/api/v1/recommendations?site_id=${encodeURIComponent(site.site_id)}`),
+            ),
+          )
+          if (!active) return
+          const uniquePlants = new Map()
+          recommendationLists.flat().forEach((plant) => {
+            uniquePlants.set(plant.species_id, plant)
+          })
+          setPlants([...uniquePlants.values()])
+          setPlantsStatus("ready")
+        } catch {
+          if (active) setPlantsStatus("error")
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSitesStatus("error")
+          setPlantsStatus("error")
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <Navbar />
+      <main>
+        <Hero />
+        <Discover sites={sites} status={sitesStatus} />
+        <PlantCatalogue plants={plants} status={plantsStatus} />
+        <About />
+      </main>
+      <Footer />
     </>
   )
 }
-
-export default App

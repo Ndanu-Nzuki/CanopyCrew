@@ -1,4 +1,6 @@
+
 import Icon from "./Icon";
+import siteImages from "../data/siteimages";
 
 function SectionHeading({ eyebrow, title, copy, action }) {
   return (
@@ -18,32 +20,39 @@ function SectionHeading({ eyebrow, title, copy, action }) {
 }
 
 function SiteCard({ site, index }) {
-  const image = [
-    "https://images.unsplash.com/photo-1780311933665-8d3e4e6a31e4?auto=format&fit=crop&w=1000&q=85",
-    "https://images.unsplash.com/photo-1756192727102-91cc51abd12c?auto=format&fit=crop&w=1000&q=85",
-    "https://images.unsplash.com/photo-1524608167924-8305dd66256b?auto=format&fit=crop&w=1000&q=85",
-  ][index % 3];
+  const image = siteImages[index % siteImages.length];
   const light = site.sunlight_exposure.replaceAll("_", " ");
 
   return (
-    <a className="site-card" href={`#site/${encodeURIComponent(site.site_id)}`}>
+    <a
+      className="site-card"
+      href={`#site/${encodeURIComponent(site.site_id)}`}
+    >
       <div className="site-image-wrap">
-        <img src={image} alt={`${site.archetype_label} planting site`} />
+        <img
+          src={image}
+          alt={`${site.archetype_label} planting site`}
+        />
         <span className="site-number">0{index + 1}</span>
         <span className="distance">
           <Icon name="pin" size={15} /> São Paulo
         </span>
       </div>
+
       <div className="site-body">
         <p className="site-location">
           <Icon name="pin" size={16} /> {site.archetype_label}
         </p>
+
         <h3>{site.name}</h3>
+
         <p className="site-description">{site.description}</p>
+
         <div className="tags">
           <span>{site.typical_dimensions}</span>
           <span>{light}</span>
         </div>
+
         <div className="card-link">
           <span>
             View site details · {site.ecological_goals.length} ecological goals
@@ -75,6 +84,7 @@ export default function Discover({ sites, status }) {
             </a>
           }
         />
+
         {status === "loading" ? (
           <p className="api-state">Loading site types…</p>
         ) : status === "error" ? (
@@ -85,7 +95,11 @@ export default function Discover({ sites, status }) {
         ) : (
           <div className="site-grid">
             {sites.map((site, index) => (
-              <SiteCard key={site.site_id} site={site} index={index} />
+              <SiteCard
+                key={site.site_id}
+                site={site}
+                index={index}
+              />
             ))}
           </div>
         )}

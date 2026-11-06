@@ -34,7 +34,7 @@ export default function Navbar() {
           </a>
         </nav>
         <a className="button button-small desktop-cta" href="#discover">
-          MyWorksapce <Icon name="arrow" size={17} />
+          MyWorkspace <Icon name="arrow" size={17} />
         </a>
         <button
           className="menu-button"

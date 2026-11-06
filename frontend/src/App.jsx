@@ -73,9 +73,20 @@ export default function App() {
     };
   }, [activeSiteId]);
 
-  // Load sites and collect their recommendations to build the catalogue.
+  // Load the full catalogue separately from site-specific recommendations.
   useEffect(() => {
     let active = true;
+
+    getJson("/api/v1/species")
+      .then((speciesData) => {
+        if (!active) return;
+
+        setPlants(speciesData);
+        setPlantsStatus("ready");
+      })
+      .catch(() => {
+        if (active) setPlantsStatus("error");
+      });
 
     // Fetch site definitions.
     getJson("/api/v1/sites")
@@ -124,19 +135,6 @@ export default function App() {
               result.recommendations,
             ]),
           ),
-        );
-
-        const uniquePlants = new Map();
-        results.forEach((result) => {
-          result.recommendations.forEach((plant) => {
-            uniquePlants.set(plant.species_id, plant);
-          });
-        });
-        setPlants([...uniquePlants.values()]);
-        setPlantsStatus(
-          results.some((result) => result.status === "ready")
-            ? "ready"
-            : "error",
         );
 
         setRecommendationsStatusBySite(

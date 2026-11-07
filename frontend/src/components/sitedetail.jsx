@@ -57,11 +57,11 @@ function NarrativeBlock({ narrative }) {
           <h3>Community Volunteer Care & Planting Guide</h3>
         </div>
         <span className="nim-model-badge">
-          meta/llama-3.1-70b-instruct · UN SDG 11.7
+          NVIDIA NIM · nvidia/nemotron-3-ultra-550b-a55b · UN SDG 11.7
         </span>
       </div>
 
-      <div className="nim-narrative-body" lang="pt-BR">
+      <div className="nim-narrative-body" lang="en">
         {blocks.map((block, index) => {
           if (block === "---") {
             return <hr key={index} className="nim-divider" />;

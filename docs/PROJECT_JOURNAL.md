@@ -84,3 +84,15 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Security (`@Idris`):** Completes `docs/SECURITY.md` deliverable with non-root container hardening, runtime vs. build IAM separation, and strict Pydantic `extra="forbid"` input validation.
 - **Verification:** Verified live Cloud Run revision `canopycrew-api-00001-fv6` at `https://canopycrew-api-sb77peq6bq-uc.a.run.app`, `test_agent.py` unit/endpoint coverage for NVIDIA NIM and deterministic fallback, and pre-commit secret/budget guardrails.
 
+### [2026-11-07] — feat(frontend): add volunteer plan builder and nim care guide ui (`feature/frontend-volunteer-plan-nim`)
+- **Author / Lane:** Laurine Ndanu Nzuki (AI Research / Lead) & Alice Severi Gonçalves (Cloud Engineering)
+- **Changes Delivered:**
+  - Updated `frontend/src/App.jsx` with a `postJson` API helper and wired `onPostPlan` into `SiteDetail`.
+  - Enhanced `frontend/src/components/sitedetail.jsx` and `frontend/src/index.css` with accessible native species selection toggles (`aria-pressed` + CSS `:has()` container styling), a deterministic Volunteer Planting Plan metrics bar (`POST /api/v1/volunteer-plan`), and an interactive **NVIDIA NIM Community Care & Planting Guide** panel (`POST /api/v1/volunteer-plan/narrative`).
+- **Cross-Lane Unblocks:**
+  - **Frontend (`@Laurine`):** Completes the end-to-end UI flow connecting the 3 São Paulo site archetypes and 10 native *Mata Atlântica* species to both deterministic cost/canopy math and NVIDIA NIM (`meta/llama-3.1-70b-instruct`) care narratives.
+  - **Product Brief (`@Barbara`):** Provides a live browser-demonstrable flow showing deterministic municipal compliance (*Portaria SVMA nº 26/2024* & *PMAU*) paired with read-only NVIDIA NIM stewardship synthesis for GCLP x MMC rubric Pillar 4.
+  - **Security (`@Idris`):** Keeps all `NVIDIA_API_KEY` handling strictly server-side (`SecretStr` / Google Secret Manager); the browser client only sends `{site_id, selected_species_ids}`.
+- **Verification:** `pytest -v` (`26 passed` across `test_health.py`, `test_endpoints.py`, and `test_agent.py`) and `npm --prefix frontend run build` (`vite build` succeeded cleanly).
+
+

@@ -1,0 +1,94 @@
+"""Asynchronous NVIDIA NIM client for generative care narrative synthesis.
+
+Owned by Laurine (AI Research / Lead).
+Connects to NVIDIA NIM accelerated inference endpoints using OpenAI-compatible format.
+Injects credentials strictly via environment variables / Google Secret Manager.
+"""
+
+import logging
+from typing import Optional
+
+import httpx
+
+from app.core.config import Settings, get_settings
+
+logger = logging.getLogger("canopycrew.agent.nim")
+
+
+class NIMClientError(Exception):
+    """Base exception for NVIDIA NIM client failures."""
+
+
+class NIMClient:
+    """Async client wrapper for NVIDIA NIM API."""
+
+    def __init__(self, settings: Optional[Settings] = None):
+        self._settings = settings or get_settings()
+
+    @property
+    def is_configured(self) -> bool:
+        """Return True if NVIDIA API key is available."""
+        return (
+            self._settings.nvidia_api_key is not None
+            and bool(self._settings.nvidia_api_key.get_secret_value().strip())
+        )
+
+    @property
+    def base_url(self) -> str:
+        """NVIDIA NIM base URL (defaults to NVIDIA API catalog if not set)."""
+        if self._settings.nvidia_base_url and self._settings.nvidia_base_url.strip():
+            return self._settings.nvidia_base_url.rstrip("/")
+        return "https://integrate.api.nvidia.com/v1"
+
+    @property
+    def model(self) -> str:
+        """Model identifier for NIM inference."""
+        if self._settings.nvidia_model and self._settings.nvidia_model.strip():
+            return self._settings.nvidia_model.strip()
+        return "meta/llama-3.1-70b-instruct"
+
+    async def generate_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+        max_tokens: int = 1024,
+    ) -> str:
+        """Call NVIDIA NIM chat completions API and return text response."""
+        if not self.is_configured:
+            raise NIMClientError("NVIDIA_API_KEY is not configured in environment.")
+
+        api_key = self._settings.nvidia_api_key.get_secret_value()
+        endpoint = f"{self.base_url}/chat/completions"
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(endpoint, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                choices = data.get("choices", [])
+                if not choices:
+                    raise NIMClientError("NVIDIA NIM response contained no choices.")
+                return choices[0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            logger.error("NVIDIA NIM returned HTTP %s: %s", exc.response.status_code, exc.response.text)
+            raise NIMClientError(f"NVIDIA NIM HTTP error {exc.response.status_code}: {exc.response.text}") from exc
+        except httpx.RequestError as exc:
+            logger.error("NVIDIA NIM network error: %s", exc)
+            raise NIMClientError(f"NVIDIA NIM connection error: {exc}") from exc

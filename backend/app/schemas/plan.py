@@ -150,3 +150,4 @@ class VolunteerPlanResponse(BaseModel):
     projected_canopy_m2_year_3: float
     selected_species_count: int
     consolidated_care_schedule: Dict[str, List[Dict[str, str]]]
+    care_narrative: str | None = None

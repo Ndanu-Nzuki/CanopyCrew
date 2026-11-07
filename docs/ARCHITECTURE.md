@@ -94,11 +94,14 @@ backend/
 ├── app/
 │   ├── main.py                  # FastAPI app initialization, router mounting, CORS policy
 │   ├── agent/                   # Laurine: NVIDIA NIM prompt templates & narrative synthesis
+│   │   ├── nim_client.py        # Async httpx client for NVIDIA NIM API (meta/llama-3.1-70b-instruct)
+│   │   ├── prompts.py           # Portuguese SDG 11.7 & wire-safety prompt templates
+│   │   └── narrative.py         # Care narrative synthesis with deterministic fallback
 │   ├── api/routes/
 │   │   ├── health.py            # GET /, GET /health, GET /api/v1/health
 │   │   ├── sites.py             # GET /api/v1/sites, GET /api/v1/sites/{site_id}
 │   │   ├── species.py           # GET /api/v1/species, GET /api/v1/species/{species_id}
-│   │   └── plans.py             # GET /api/v1/recommendations, POST /api/v1/volunteer-plan
+│   │   └── plans.py             # GET /api/v1/recommendations, POST /api/v1/volunteer-plan, POST /api/v1/volunteer-plan/narrative
 │   ├── core/
 │   │   └── config.py            # pydantic-settings env loader (SecretStr for NVIDIA_API_KEY)
 │   ├── schemas/
@@ -110,7 +113,8 @@ backend/
 │   └── species.json             # 10 verified native Atlantic Forest species
 ├── tests/
 │   ├── test_health.py           # Health probe tests
-│   └── test_endpoints.py        # Site, recommendation, wire-safety & plan math unit tests
+│   ├── test_endpoints.py        # Site, recommendation, wire-safety & plan math unit tests
+│   └── test_agent.py            # NVIDIA NIM client, prompt, and fallback unit/endpoint tests
 ├── pytest.ini
 └── requirements.txt             # Pinned lightweight Python 3.12.7 dependencies
 ```
@@ -140,7 +144,8 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 | `GET` | `/api/v1/species` | `species.list_species` | `200` | Returns all 10 verified native Atlantic Forest `NativeSpecies` objects. |
 | `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404` | Returns a single `NativeSpecies` by `species_id` or `404` if unknown. |
 | `GET` | `/api/v1/recommendations?site_id=...` | `plans.recommend_species` | `200`, `404`, `422` | Deterministically filters the 10-species catalog for municipal wire safety and site suitability. |
-| `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), and volunteer care tasks. |
+| `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), volunteer care tasks, and optional `?include_narrative=true` care narrative. |
+| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic Portuguese fallback when unconfigured). |
 
 ---
 
@@ -154,13 +159,15 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 - **Secret Isolation:** `Settings.nvidia_api_key` uses Pydantic's `SecretStr` so credentials never leak in stack traces or repr logs. `.env` files are strictly gitignored; production secrets are mounted exclusively from Google Secret Manager.
 
 ### Serverless Cloud Run Deployment Template (`$0` Spend Guardrail)
-Deployments bind to `PORT` (injected automatically by Cloud Run as `8080`, mapped via `AliasChoices("PORT", "API_PORT")` in `config.py`) and enforce zero-instance scale-down:
+Deployments bind to `PORT` (injected automatically by Cloud Run as `8080`, mapped via `AliasChoices("PORT", "API_PORT")` in `config.py`), run as an unprivileged container user (`appuser`), and enforce zero-instance scale-down in an **Always Free Tier** region (`us-central1`) inside the isolated `canopycrew-sp-mvp` project:
 
 ```bash
 gcloud run deploy canopycrew-api \
   --source ./backend \
-  --region southamerica-east1 \
+  --project canopycrew-sp-mvp \
+  --region us-central1 \
   --platform managed \
+  --service-account canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com \
   --allow-unauthenticated \
   --min-instances 0 \
   --max-instances 2 \
@@ -169,6 +176,14 @@ gcloud run deploy canopycrew-api \
   --set-env-vars "APP_ENV=production,DEBUG=false" \
   --set-secrets "NVIDIA_API_KEY=canopycrew-nvidia-api-key:latest"
 ```
+
+### Isolated GCP Project & Least-Privilege Runtime Architecture
+- **Live Production URL:** `https://canopycrew-api-sb77peq6bq-uc.a.run.app`
+- **Isolated Project Boundary:** `canopycrew-sp-mvp` (dedicated strictly to CanopyCrew MVP workloads, isolated from personal/external GCP projects).
+- **Always Free Tier Region:** `us-central1` (eligible for Google Cloud Run's Always Free quota of 2 million requests/month, 180,000 vCPU-seconds, and 360,000 GiB-seconds).
+- **Container Runtime Hardening:** `backend/Dockerfile` builds on `python:3.12-slim` and drops root privileges (`USER appuser`) prior to starting `uvicorn`.
+- **Service Account Separation:** Cloud Build executes image builds using its dedicated build service agent, while the running container executes under the least-privilege `canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` identity (which holds zero build or artifact-write permissions). See [`docs/SECURITY.md`](./SECURITY.md) for the complete IAM and security specification.
+- **Health Probe:** `curl -s https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1/health` -> `{"status":"healthy","app":"CanopyCrew API"}`
 
 > **Budget Guardrail:** Never increase `--min-instances` above `0`, never increase `--max-instances` above `2`, and never provision Cloud SQL or paid VPC connectors.
 

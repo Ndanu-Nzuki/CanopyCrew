@@ -69,5 +69,22 @@ def test_settings_masks_api_key_and_ignores_extra_env(monkeypatch) -> None:
     assert "http://localhost:5173" in cfg.cors_origins
     assert "https://canopycrew.org" in cfg.cors_origins
     assert cfg.nvidia_api_key is not None
+    assert cfg.has_nvidia_api_key is True
     assert "test-placeholder-value" not in repr(cfg)
+    assert "test-placeholder-value" not in str(cfg.nvidia_api_key)
+
+    empty_cfg = Settings(_env_file=None, nvidia_api_key="   ")
+    assert empty_cfg.has_nvidia_api_key is False
+
+
+def test_ignore_files_exclude_dotenv_secrets() -> None:
+    from app.core.config import BACKEND_DIR, REPO_ROOT
+
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    dockerignore = (BACKEND_DIR / ".dockerignore").read_text(encoding="utf-8")
+    gcloudignore = (BACKEND_DIR / ".gcloudignore").read_text(encoding="utf-8")
+
+    assert ".env" in gitignore
+    assert ".env*" in dockerignore
+    assert ".env*" in gcloudignore
 

@@ -9,7 +9,7 @@ import SiteDetail from "./components/sitedetail";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/+$/, "");
+).replace(/\/+(?:api\/v1\/?)?$/, "");
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE_URL}${path}`);
@@ -215,6 +215,7 @@ export default function App() {
         {activeSiteId ? (
           activeSite ? (
             <SiteDetail
+              key={activeSite.site_id}
               site={activeSite}
               recommendations={recommendationsBySite[activeSiteId] || []}
               status={

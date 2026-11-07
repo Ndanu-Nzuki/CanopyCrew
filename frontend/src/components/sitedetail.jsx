@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Icon from "./Icon";
 import siteImages from "../data/siteimages";
 
@@ -201,24 +201,21 @@ export default function SiteDetail({
   const goals = site.ecological_goals || [];
   const dimensions = site.constraints;
 
-  const [selectedSpeciesIds, setSelectedSpeciesIds] = useState([]);
+  const defaultSpeciesIds = recommendations.map((plant) => plant.species_id);
+  const [customSelection, setCustomSelection] = useState(null);
   const [planResult, setPlanResult] = useState(null);
   const [planStatus, setPlanStatus] = useState("idle");
   const [planError, setPlanError] = useState("");
 
-  useEffect(() => {
-    setSelectedSpeciesIds(recommendations.map((plant) => plant.species_id));
-    setPlanResult(null);
-    setPlanStatus("idle");
-    setPlanError("");
-  }, [site.site_id, recommendations]);
+  const selectedSpeciesIds = customSelection ?? defaultSpeciesIds;
 
   const toggleSpeciesSelection = (speciesId) => {
-    setSelectedSpeciesIds((current) =>
-      current.includes(speciesId)
-        ? current.filter((id) => id !== speciesId)
-        : [...current, speciesId],
-    );
+    setCustomSelection((current) => {
+      const base = current ?? defaultSpeciesIds;
+      return base.includes(speciesId)
+        ? base.filter((id) => id !== speciesId)
+        : [...base, speciesId];
+    });
   };
 
   const submitVolunteerPlan = async (withNarrative) => {
@@ -355,11 +352,7 @@ export default function SiteDetail({
                   <button
                     type="button"
                     className="clear-button"
-                    onClick={() =>
-                      setSelectedSpeciesIds(
-                        recommendations.map((p) => p.species_id),
-                      )
-                    }
+                    onClick={() => setCustomSelection(null)}
                   >
                     Select all ({recommendations.length})
                   </button>
@@ -367,7 +360,7 @@ export default function SiteDetail({
                     <button
                       type="button"
                       className="clear-button"
-                      onClick={() => setSelectedSpeciesIds([])}
+                      onClick={() => setCustomSelection([])}
                     >
                       Clear selection
                     </button>

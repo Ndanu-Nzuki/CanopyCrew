@@ -55,14 +55,14 @@ class NIMClient:
         """Model identifier for NIM inference."""
         if self._settings.nvidia_model and self._settings.nvidia_model.strip():
             return self._settings.nvidia_model.strip()
-        return "meta/llama-3.1-70b-instruct"
+        return "nvidia/nemotron-3-ultra-550b-a55b"
 
     async def generate_completion(
         self,
         system_prompt: str,
         user_prompt: str,
         temperature: float = 0.2,
-        max_tokens: int = 1024,
+        max_tokens: int = 800,
     ) -> str:
         """Call NVIDIA NIM chat completions API and return text response."""
         if not self.is_configured:
@@ -88,14 +88,18 @@ class NIMClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(endpoint, json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
                 choices = data.get("choices", [])
                 if not choices:
                     raise NIMClientError("NVIDIA NIM response contained no choices.")
-                return choices[0]["message"]["content"]
+                message = choices[0].get("message", {})
+                content = message.get("content") or message.get("reasoning_content")
+                if not content or not str(content).strip():
+                    raise NIMClientError("NVIDIA NIM response contained empty message content.")
+                return str(content).strip()
         except httpx.HTTPStatusError as exc:
             safe_body = _redact_secret(exc.response.text, api_key)
             logger.error(

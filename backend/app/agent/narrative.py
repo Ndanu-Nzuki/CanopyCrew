@@ -1,10 +1,10 @@
 """Care narrative synthesis service with graceful deterministic degradation.
 
 Owned by Laurine (AI Research / Lead).
-Synthesizes accessible, bilingual-friendly natural-language volunteer care narratives
-from already-validated site archetypes and deterministic volunteer plans.
-Degrades gracefully to deterministic narrative when NVIDIA_API_KEY is not configured
-or external NIM endpoints are unreachable.
+Synthesizes accessible, English-language volunteer care narratives with Brazilian
+Portuguese botanical grounding from already-validated site archetypes and
+deterministic volunteer plans. Degrades gracefully to deterministic narrative
+when NVIDIA_API_KEY is not configured or external NIM endpoints are unreachable.
 """
 
 import logging
@@ -23,7 +23,7 @@ def build_fallback_narrative(
     plan: VolunteerPlanResponse,
     species_list: List[NativeSpecies],
 ) -> str:
-    """Deterministically compose a community volunteer planting guide.
+    """Deterministically compose a community volunteer planting guide in English.
 
     Used when NVIDIA NIM is offline, unconfigured, or in test environments.
     """
@@ -31,21 +31,21 @@ def build_fallback_narrative(
     if site.constraints.overhead_power_lines:
         wire_warning = (
             "\n> [!IMPORTANT]\n"
-            "> **Segurança com a Rede Elétrica Aérea (Portaria SVMA nº 26/2024 & PMAU):**\n"
-            f"> Este local possui fiação elétrica aérea. Todas as {plan.selected_species_count} espécies "
-            f"selecionadas têm porte compacto (máximo {site.constraints.max_mature_height_meters} m) "
-            "e raízes não agressivas, garantindo total segurança para pedestres e para a infraestrutura urbana.\n"
+            "> **Overhead Power-Line Safety (Portaria SVMA nº 26/2024 & PMAU):**\n"
+            f"> This site has overhead power lines. All {plan.selected_species_count} selected species "
+            f"have a compact mature height (maximum {site.constraints.max_mature_height_meters} m) "
+            "and non-invasive root systems, ensuring full safety for pedestrians and urban utility infrastructure.\n"
         )
 
     species_lines = []
     for sp in species_list:
         species_lines.append(
-            f"- **{sp.botanical.common_name_pt}** (*{sp.botanical.scientific_name}*)\n"
-            f"  - **Porte & Copa:** {sp.physical_profile.mature_height_meters} m de altura | "
-            f"Copa projetada: {sp.estimates.canopy_coverage_m2_at_year_3} m² (Ano 3)\n"
-            f"  - **Função Ecológica:** {sp.ecological_interactions.ecological_role}\n"
-            f"  - **Atrativo para Fauna:** Polinizada por {', '.join(sp.ecological_interactions.pollinators)}; "
-            f"frutos dispersos por {', '.join(sp.ecological_interactions.seed_dispersers_avifauna)}."
+            f"- **{sp.botanical.common_name_en} / {sp.botanical.common_name_pt}** (*{sp.botanical.scientific_name}*)\n"
+            f"  - **Height & Canopy:** {sp.physical_profile.mature_height_meters} m mature height | "
+            f"Projected canopy: {sp.estimates.canopy_coverage_m2_at_year_3} m² (Year 3)\n"
+            f"  - **Ecological Role:** {sp.ecological_interactions.ecological_role}\n"
+            f"  - **Biodiversity Value:** Pollinated by {', '.join(sp.ecological_interactions.pollinators)}; "
+            f"seeds dispersed by {', '.join(sp.ecological_interactions.seed_dispersers_avifauna)}."
         )
     species_section = "\n".join(species_lines)
 
@@ -63,40 +63,40 @@ def build_fallback_narrative(
         for t in schedule.get("annual", [])
     )
 
-    return f"""# 🌱 Guia do Mutirão de Plantio — {site.name}
+    return f"""# 🌱 Community Planting & Care Guide — {site.name}
 
-Bem-vindos ao mutirão de restauração urbana do **CanopyCrew**! Este guia foi elaborado para apoiar vizinhos e voluntários na implantação e no cuidado das mudas, contribuindo diretamente para o **ODS 11 da ONU (Meta 11.7: espaços públicos verdes, inclusivos e acessíveis em São Paulo)**.
+Welcome to the **CanopyCrew** community urban restoration action! This guide supports neighbors and local volunteers in planting and stewarding native seedlings, directly advancing **UN SDG 11 (Target 11.7: safe, inclusive, and accessible green public spaces in São Paulo)**.
 {wire_warning}
 ---
 
-## 📊 Resumo do Plano Comunitário
-- **Arquétipo do Local:** {site.archetype_label} ({site.sunlight_exposure.replace('_', ' ')})
-- **Total de Mudas Selecionadas:** {plan.selected_species_count}
-- **Investimento Estimado em Mudas:** ${plan.total_seedling_cost_usd:.2f} USD
-- **Projeção de Copa em 3 Anos:** {plan.projected_canopy_m2_year_3:.1f} m² de sombra e microclima restaurado
+## 📊 Community Plan Summary
+- **Site Archetype:** {site.archetype_label} ({site.sunlight_exposure.replace('_', ' ')})
+- **Total Selected Seedlings:** {plan.selected_species_count}
+- **Estimated Seedling Cost:** ${plan.total_seedling_cost_usd:.2f} USD
+- **Projected Year-3 Canopy:** {plan.projected_canopy_m2_year_3:.1f} m² of restored shade and cooling microclimate
 
 ---
 
-## 🌿 Espécies Nativas da Mata Atlântica Selecionadas
-Todas as espécies são 100% nativas, registradas no BioSampa e certificadas para o município de São Paulo:
+## 🌿 Selected Native Atlantic Forest Species
+Every species below is 100% native to the Atlantic Forest (*Mata Atlântica*), cataloged in BioSampa, and verified for São Paulo municipal planting:
 
 {species_section}
 
 ---
 
-## 🗓️ Calendário de Cuidado Comunitário
+## 🗓️ Community Volunteer Care Schedule
 
-### 1. Mês Inicial (Fase Crítica de Pegamento)
-{initial_items or '- Monitoramento regular de umidade e proteção do colo da muda.'}
+### 1. Initial Month (Critical Establishment Phase)
+{initial_items or '- Regular soil moisture checks and root-collar mulch protection.'}
 
-### 2. Manutenção Trimestral (Nutrição e Controle Competitivo)
-{quarterly_items or '- Adubação com composto orgânico e coroamento livre de gramíneas.'}
+### 2. Quarterly Maintenance (Nutrition & Weed Control)
+{quarterly_items or '- Organic compost top-dressing and clearing competing grasses around the basin.'}
 
-### 3. Cuidado Anual (Poda Formativa e Vistoria Estrutural)
-{annual_items or '- Vistoria anual conforme normas do PMAU.'}
+### 3. Annual Care (Formative Pruning & Structural Inspection)
+{annual_items or '- Annual structural and phytosanitary inspection aligned with PMAU guidelines.'}
 
 ---
-*CanopyCrew — Fortalecendo a biodiversidade urbana de São Paulo com rigor botânico e ação comunitária.*"""
+*CanopyCrew — Advancing São Paulo urban biodiversity through botanical rigor and community stewardship.*"""
 
 
 async def generate_volunteer_care_narrative(
@@ -124,6 +124,7 @@ async def generate_volunteer_care_narrative(
     species_details = [
         {
             "scientific_name": sp.botanical.scientific_name,
+            "common_name_en": sp.botanical.common_name_en,
             "common_name_pt": sp.botanical.common_name_pt,
             "growth_habit": sp.physical_profile.growth_habit,
             "mature_height_meters": sp.physical_profile.mature_height_meters,

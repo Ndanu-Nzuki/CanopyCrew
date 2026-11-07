@@ -33,11 +33,11 @@ client = TestClient(app)
 
 def test_nim_client_properties_and_configuration():
     # Unconfigured settings
-    unconfigured_settings = Settings(nvidia_api_key=None)
+    unconfigured_settings = Settings(_env_file=None, nvidia_api_key=None)
     nim = NIMClient(settings=unconfigured_settings)
     assert not nim.is_configured
     assert nim.base_url == "https://integrate.api.nvidia.com/v1"
-    assert nim.model == "meta/llama-3.1-70b-instruct"
+    assert nim.model == "nvidia/nemotron-3-ultra-550b-a55b"
 
     # Configured settings
     configured_settings = Settings(
@@ -53,7 +53,7 @@ def test_nim_client_properties_and_configuration():
 
 def test_build_user_prompt_formatting():
     prompt = build_user_prompt(
-        site_name="Faixa de Calçada Compacta",
+        site_name="Compact Sidewalk Strip",
         site_label="Sidewalk Strip",
         sunlight="full sun",
         overhead_power_lines=True,
@@ -64,31 +64,32 @@ def test_build_user_prompt_formatting():
         species_details=[
             {
                 "scientific_name": "Eugenia uniflora",
+                "common_name_en": "Surinam Cherry",
                 "common_name_pt": "Pitangueira",
                 "growth_habit": "small_tree",
                 "mature_height_meters": 5.0,
                 "canopy_coverage_m2_at_year_3": 4.2,
-                "ecological_role": "Atrator de polinizadores e avifauna",
-                "pollinators": ["Abelhas nativas"],
-                "seed_dispersers": ["Sabiás"],
+                "ecological_role": "Attracts native pollinators and urban avifauna",
+                "pollinators": ["Native stingless bees"],
+                "seed_dispersers": ["Thrushes"],
             }
         ],
         consolidated_schedule={
             "initial_month": [
                 {
                     "species": "Pitangueira",
-                    "task": "Rega profunda",
-                    "frequency": "2x por semana",
-                    "notes": "Colo livre",
+                    "task": "Deep watering",
+                    "frequency": "Twice weekly",
+                    "notes": "Keep root collar clear",
                 }
             ],
             "maintenance_quarterly": [],
             "annual": [],
         },
     )
-    assert "Faixa de Calçada Compacta" in prompt
-    assert "Fiação Elétrica Aérea: Sim" in prompt
-    assert "Pitangueira" in prompt
+    assert "Compact Sidewalk Strip" in prompt
+    assert "Overhead Power Lines: Yes" in prompt
+    assert "Surinam Cherry / Pitangueira" in prompt
     assert "$21.00 USD" in prompt
 
 
@@ -105,8 +106,8 @@ def test_deterministic_fallback_narrative_wire_safety():
     )
 
     narrative = build_fallback_narrative(site_a, plan, selected)
-    assert "Meta 11.7" in narrative
-    assert "Segurança com a Rede Elétrica Aérea" in narrative
+    assert "Target 11.7" in narrative
+    assert "Overhead Power-Line Safety" in narrative
     assert "Pitangueira" in narrative
     assert "Esponjinha-vermelha" in narrative
     assert f"${plan.total_seedling_cost_usd:.2f}" in narrative
@@ -126,9 +127,9 @@ async def test_generate_narrative_graceful_degradation_when_unconfigured():
         site=site_b,
         plan=plan,
         selected_species_ids=["cecropia-pachystachya", "schinus-terebinthifolia"],
-        client=NIMClient(settings=Settings(nvidia_api_key=None)),
+        client=NIMClient(settings=Settings(_env_file=None, nvidia_api_key=None)),
     )
-    assert "Guia do Mutirão de Plantio" in narrative
+    assert "Community Planting & Care Guide" in narrative
     assert "Embaúba-branca" in narrative
     assert "Aroeira-pimenteira" in narrative
 
@@ -145,7 +146,7 @@ async def test_generate_narrative_with_nim_client_success():
 
     mock_client = AsyncMock(spec=NIMClient)
     mock_client.is_configured = True
-    mock_client.generate_completion.return_value = "### Roteiro Comunitário Gerado com Sucesso via NVIDIA NIM"
+    mock_client.generate_completion.return_value = "### Community Care Guide Generated via NVIDIA NIM"
 
     narrative = await generate_volunteer_care_narrative(
         site=site,
@@ -154,7 +155,7 @@ async def test_generate_narrative_with_nim_client_success():
         client=mock_client,
     )
 
-    assert narrative == "### Roteiro Comunitário Gerado com Sucesso via NVIDIA NIM"
+    assert narrative == "### Community Care Guide Generated via NVIDIA NIM"
     mock_client.generate_completion.assert_awaited_once()
 
 
@@ -180,7 +181,7 @@ async def test_generate_narrative_nim_failure_falls_back():
     )
 
     # Must fall back gracefully rather than throwing exception
-    assert "Guia do Mutirão de Plantio" in narrative
+    assert "Community Planting & Care Guide" in narrative
     assert "Pitangueira" in narrative
 
 
@@ -213,7 +214,7 @@ def test_endpoint_volunteer_plan_with_narrative(monkeypatch):
     assert data["selected_species_count"] == 2
     assert "care_narrative" in data
     assert data["care_narrative"] is not None
-    assert "Guia do Mutirão de Plantio" in data["care_narrative"]
+    assert "Community Planting & Care Guide" in data["care_narrative"]
 
 
 def test_endpoint_volunteer_plan_query_param_narrative(monkeypatch):
@@ -237,4 +238,4 @@ def test_endpoint_volunteer_plan_query_param_narrative(monkeypatch):
     res_narrative = client.post("/api/v1/volunteer-plan?include_narrative=true", json=payload)
     assert res_narrative.status_code == 200
     assert res_narrative.json().get("care_narrative") is not None
-    assert "Guia do Mutirão de Plantio" in res_narrative.json()["care_narrative"]
+    assert "Community Planting & Care Guide" in res_narrative.json()["care_narrative"]

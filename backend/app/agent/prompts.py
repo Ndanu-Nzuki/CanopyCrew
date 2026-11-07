@@ -7,19 +7,19 @@ Strictly grounded in UN SDG 11.7, São Paulo municipal botanical compliance
 
 from typing import Any, Dict, List
 
-NIM_SYSTEM_PROMPT = """Você é o Guia de Restauração Ecológica Comunitária do CanopyCrew (UN SDG 11: Cidades e Comunidades Sustentáveis — Meta 11.7).
-Sua missão é sintetizar narrativas de cuidado e plantio comunitário encorajadoras, práticas e acessíveis para voluntários em São Paulo.
+NIM_SYSTEM_PROMPT = """You are the CanopyCrew Community Ecological Restoration Guide (UN SDG 11: Sustainable Cities and Communities — Target 11.7).
+Your mission is to synthesize encouraging, practical, and accessible community planting and volunteer care guides for urban rewilding sites in São Paulo, Brazil.
 
-DIRETRIZES E INVARIANTES ECOLÓGICAS E LEGAIS:
-1. Conformidade Botânica Estrita: Baseie-se exclusivamente nas espécies nativas da Mata Atlântica fornecidas pelo sistema determinístico. Jamais sugira ou introduza espécies exóticas ou invasoras (ex.: Ficus microcarpa, Ligustrum lucidum, Eucalyptus).
-2. Segurança com Fiação Elétrica (Portaria SVMA nº 26/2024 e PMAU): Se o local tiver fiação aérea (overhead power lines), ressalte com clareza por que todas as espécies selecionadas têm porte compacto (<= 5,0 m) e são seguras sob os fios da rede de distribuição.
-3. Precisão Matemática: Jamais altere, recalcule ou contradiga os valores determinísticos de custo de mudas (USD) ou cobertura de copa projetada (m²) calculados pelo backend.
-4. Linguagem Acolhedora e Bilíngue: Escreva em Português do Brasil claro, caloroso e acessível para vizinhos e voluntários comunitários, mencionando os nomes populares e científicos das espécies.
-5. Estrutura do Roteiro:
-   - Boas-vindas e Propósito Comunitário (ODS 11.7 em São Paulo)
-   - Cuidados do Local e Segurança (atenção à fiação aérea e solo permeável)
-   - Destaque das Espécies e Biodiversidade (polinizadores e avifauna nativa)
-   - Jornada do Voluntário (Mês Inicial de Estabelecimento, Manutenção Trimestral e Cuidado Anual)
+ECOLOGICAL AND LEGAL INVARIANTS:
+1. Strict Botanical Compliance: Rely exclusively on the native Atlantic Forest (Mata Atlântica) species provided by the deterministic backend. Never suggest or introduce exotic or invasive species (e.g., Ficus microcarpa, Ligustrum lucidum, Eucalyptus).
+2. Overhead Power-Line Safety (Portaria SVMA nº 26/2024 & PMAU): If the site has overhead power lines, clearly highlight why every selected species has a compact mature height (<= 5.0 m) and non-invasive roots that are safe beneath utility distribution wires.
+3. Mathematical Precision: Never alter, recalculate, or contradict the deterministic seedling cost (USD) or projected Year-3 canopy coverage (m²) computed by the Python backend.
+4. Welcoming English Narrative with Local Grounding: Write in clear, warm, and accessible English for community volunteers, referencing each species by its English name, Brazilian Portuguese common name, and scientific name.
+5. Guide Structure:
+   - Welcome & Community Mission (UN SDG 11.7 in São Paulo)
+   - Site Safety & Growing Conditions (overhead power-line clearance and soil care)
+   - Native Species & Urban Biodiversity Highlights (native pollinators and seed-dispersing birds)
+   - Volunteer Care Roadmap (Initial Establishment Month, Quarterly Maintenance, and Annual Care)
 """
 
 
@@ -38,13 +38,19 @@ def build_user_prompt(
     """Format validated site context and deterministic totals into user prompt for NIM."""
     species_summary_lines: List[str] = []
     for sp in species_details:
+        common_en = sp.get("common_name_en")
+        name_prefix = (
+            f"{common_en} / {sp['common_name_pt']}"
+            if common_en
+            else sp["common_name_pt"]
+        )
         species_summary_lines.append(
-            f"- {sp['common_name_pt']} ({sp['scientific_name']}): "
-            f"Porte {sp['growth_habit']} ({sp['mature_height_meters']} m), "
-            f"Copa Ano 3: {sp['canopy_coverage_m2_at_year_3']} m², "
-            f"Papel ecológico: {sp['ecological_role']}, "
-            f"Polinizadores: {', '.join(sp['pollinators'])}, "
-            f"Aves dispersoras: {', '.join(sp['seed_dispersers'])}"
+            f"- {name_prefix} ({sp['scientific_name']}): "
+            f"Growth habit {sp['growth_habit']} ({sp['mature_height_meters']} m), "
+            f"Year-3 canopy: {sp['canopy_coverage_m2_at_year_3']} m², "
+            f"Ecological role: {sp['ecological_role']}, "
+            f"Pollinators: {', '.join(sp['pollinators'])}, "
+            f"Seed-dispersing birds: {', '.join(sp['seed_dispersers'])}"
         )
     species_block = "\n".join(species_summary_lines)
 
@@ -62,36 +68,37 @@ def build_user_prompt(
     )
 
     wire_note = (
-        "ATENÇÃO CRÍTICA: O local possui fiação elétrica aérea. Todas as espécies foram verificadas "
-        f"como seguras (altura máxima <= {max_mature_height_meters} m) de acordo com o PMAU."
+        "CRITICAL SAFETY NOTE: This site has overhead power lines. All selected species have been "
+        f"deterministically verified as wire-safe (maximum mature height <= {max_mature_height_meters} m) "
+        "in compliance with Portaria SVMA nº 26/2024 and PMAU."
         if overhead_power_lines
-        else "Local livre de interferência de fiação aérea baixa."
+        else "Site is clear of low-hanging overhead power lines."
     )
 
-    return f"""Elabore o Guia do Voluntário para o seguinte plano de plantio validado:
+    return f"""Write a Community Volunteer Care & Planting Guide in English for the following validated planting plan:
 
-DADOS DO LOCAL:
-- Arquétipo: {site_label} ({site_name})
-- Exposição Solar: {sunlight}
-- Fiação Elétrica Aérea: {'Sim' if overhead_power_lines else 'Não'}
-- Observação de Segurança: {wire_note}
+SITE CONTEXT:
+- Archetype: {site_label} ({site_name})
+- Sunlight Exposure: {sunlight}
+- Overhead Power Lines: {'Yes' if overhead_power_lines else 'No'}
+- Safety Note: {wire_note}
 
-TOTAIS DETERMINÍSTICOS DO PLANO:
-- Quantidade de Mudas Selecionadas: {selected_species_count}
-- Custo Total Estimado de Mudas: ${total_cost_usd:.2f} USD
-- Cobertura de Copa Projetada (Ano 3): {projected_canopy_m2:.1f} m²
+DETERMINISTIC PLAN TOTALS:
+- Selected Native Seedlings: {selected_species_count}
+- Total Estimated Seedling Cost: ${total_cost_usd:.2f} USD
+- Projected Canopy Coverage (Year 3): {projected_canopy_m2:.1f} m²
 
-ESPÉCIES NATIVAS DA MATA ATLÂNTICA SELECIONADAS:
+SELECTED NATIVE ATLANTIC FOREST SPECIES:
 {species_block}
 
-TAREFAS CONSOLIDADAS DE MANUTENÇÃO:
-Mês Inicial:
-{initial_tasks or '  * Nenhuma tarefa específica cadastrada.'}
+CONSOLIDATED VOLUNTEER MAINTENANCE SCHEDULE:
+Initial Month:
+{initial_tasks or '  * No specific tasks registered.'}
 
-Manutenção Trimestral:
-{quarterly_tasks or '  * Nenhuma tarefa específica cadastrada.'}
+Quarterly Maintenance:
+{quarterly_tasks or '  * No specific tasks registered.'}
 
-Cuidado Anual:
-{annual_tasks or '  * Nenhuma tarefa específica cadastrada.'}
+Annual Care:
+{annual_tasks or '  * No specific tasks registered.'}
 
-Por favor, gere uma narrativa acolhedora, vibrante e bem organizada em Markdown para motivar os voluntários locais."""
+Please generate a welcoming, practical, and well-structured Markdown care narrative in English to guide local volunteers."""

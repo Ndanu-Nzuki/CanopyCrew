@@ -21,6 +21,35 @@ async function getJson(path) {
   return response.json();
 }
 
+async function postJson(path, body) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.detail) {
+        detail =
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : JSON.stringify(errorData.detail);
+      }
+    } catch {
+      // Keep default status error message when body is not JSON
+    }
+    throw new Error(detail);
+  }
+
+  return response.json();
+}
+
 export default function App() {
   const [sites, setSites] = useState([]);
   const [plants, setPlants] = useState([]);
@@ -192,6 +221,7 @@ export default function App() {
                 recommendationsStatusBySite[activeSiteId] || "loading"
               }
               onBack={goBack}
+              onPostPlan={postJson}
             />
           ) : (
             <section className="section site-detail">

@@ -17,7 +17,7 @@ from app.agent.narrative import (
     build_fallback_narrative,
     generate_volunteer_care_narrative,
 )
-from app.agent.nim_client import NIMClient, NIMClientError
+from app.agent.nim_client import NIMClient, NIMClientError, _redact_secret
 from app.agent.prompts import build_user_prompt
 from app.core.config import Settings
 from app.main import app
@@ -184,7 +184,20 @@ async def test_generate_narrative_nim_failure_falls_back():
     assert "Pitangueira" in narrative
 
 
-def test_endpoint_volunteer_plan_with_narrative():
+def test_redact_secret_scrubs_nvapi_tokens():
+    raw = "nvapi-secret-token-99999"
+    leaked = f"Bearer {raw} failed with key nvapi-another-12345"
+    scrubbed = _redact_secret(leaked, raw)
+    assert raw not in scrubbed
+    assert "nvapi-another-12345" not in scrubbed
+    assert "nvapi-[REDACTED]" in scrubbed
+
+
+def test_endpoint_volunteer_plan_with_narrative(monkeypatch):
+    monkeypatch.setattr(
+        "app.agent.narrative.NIMClient",
+        lambda: NIMClient(settings=Settings(_env_file=None, nvidia_api_key=None)),
+    )
     payload = {
         "site_id": "site-a-sidewalk-strip",
         "selected_species_ids": [
@@ -203,7 +216,11 @@ def test_endpoint_volunteer_plan_with_narrative():
     assert "Guia do Mutirão de Plantio" in data["care_narrative"]
 
 
-def test_endpoint_volunteer_plan_query_param_narrative():
+def test_endpoint_volunteer_plan_query_param_narrative(monkeypatch):
+    monkeypatch.setattr(
+        "app.agent.narrative.NIMClient",
+        lambda: NIMClient(settings=Settings(_env_file=None, nvidia_api_key=None)),
+    )
     payload = {
         "site_id": "site-c-shaded-courtyard",
         "selected_species_ids": [

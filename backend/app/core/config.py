@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_model: str = "meta/llama-3.1-70b-instruct"
 
+    @property
+    def has_nvidia_api_key(self) -> bool:
+        """Safely check whether a non-empty NVIDIA_API_KEY is configured without exposing it."""
+        return (
+            self.nvidia_api_key is not None
+            and bool(self.nvidia_api_key.get_secret_value().strip())
+        )
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: str | list[str]) -> list[str]:

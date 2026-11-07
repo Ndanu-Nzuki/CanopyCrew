@@ -6,6 +6,7 @@ Injects credentials strictly via environment variables / Google Secret Manager.
 """
 
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -13,6 +14,18 @@ import httpx
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger("canopycrew.agent.nim")
+
+_NVAPI_TOKEN_PATTERN = re.compile(r"nvapi-[A-Za-z0-9_\-]+")
+
+
+def _redact_secret(text: str, raw_key: Optional[str] = None) -> str:
+    """Scrub any NVIDIA API key or Bearer token from error and log strings."""
+    if not text:
+        return text
+    sanitized = _NVAPI_TOKEN_PATTERN.sub("nvapi-[REDACTED]", text)
+    if raw_key and raw_key.strip():
+        sanitized = sanitized.replace(raw_key.strip(), "[REDACTED]")
+    return sanitized
 
 
 class NIMClientError(Exception):
@@ -28,10 +41,7 @@ class NIMClient:
     @property
     def is_configured(self) -> bool:
         """Return True if NVIDIA API key is available."""
-        return (
-            self._settings.nvidia_api_key is not None
-            and bool(self._settings.nvidia_api_key.get_secret_value().strip())
-        )
+        return self._settings.has_nvidia_api_key
 
     @property
     def base_url(self) -> str:
@@ -87,8 +97,16 @@ class NIMClient:
                     raise NIMClientError("NVIDIA NIM response contained no choices.")
                 return choices[0]["message"]["content"]
         except httpx.HTTPStatusError as exc:
-            logger.error("NVIDIA NIM returned HTTP %s: %s", exc.response.status_code, exc.response.text)
-            raise NIMClientError(f"NVIDIA NIM HTTP error {exc.response.status_code}: {exc.response.text}") from exc
+            safe_body = _redact_secret(exc.response.text, api_key)
+            logger.error(
+                "NVIDIA NIM returned HTTP %s: %s",
+                exc.response.status_code,
+                safe_body,
+            )
+            raise NIMClientError(
+                f"NVIDIA NIM HTTP error {exc.response.status_code}: {safe_body}"
+            ) from None
         except httpx.RequestError as exc:
-            logger.error("NVIDIA NIM network error: %s", exc)
-            raise NIMClientError(f"NVIDIA NIM connection error: {exc}") from exc
+            safe_err = _redact_secret(str(exc), api_key)
+            logger.error("NVIDIA NIM network error: %s", safe_err)
+            raise NIMClientError(f"NVIDIA NIM connection error: {safe_err}") from None

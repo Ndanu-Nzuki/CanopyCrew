@@ -48,8 +48,8 @@ class Settings(BaseSettings):
 
     # Optional NVIDIA NIM integration (injected via Google Secret Manager in production)
     nvidia_api_key: SecretStr | None = None
-    nvidia_base_url: str | None = None
-    nvidia_model: str | None = None
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_model: str = "meta/llama-3.1-70b-instruct"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

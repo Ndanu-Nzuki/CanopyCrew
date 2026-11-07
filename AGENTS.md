@@ -41,3 +41,14 @@ CanopyCrew follows the open `SKILL.md` standard under `.agents/skills/`. Wheneve
 5. **Security & `$0` Budget:** Zero hardcoded secrets or `.env` commits (`NVIDIA_API_KEY` injected via Google Secret Manager). Restrict GCP resources to Free Tier quotas (`--allow-unauthenticated --min-instances 0 --max-instances 2`).
 6. **Git Hygiene:** Never commit or push directly to `main`. Use `<prefix>/<scope>-<kebab-topic>` branches and `<type>(<scope>): <summary>` Conventional Commits. Do not modify shared files (`README.md`, `LICENSE`, `.gitignore`, `.env.example`, `docs/PRODUCT_BRIEF.md`) unless explicitly instructed.
 
+---
+
+## 4. Custom Workspace Subagents (`.agents/agents/`)
+
+CanopyCrew defines dedicated workspace subagents to enforce guardrails and streamline domain tasks:
+
+| Subagent | Path | Role & Mandate |
+| :--- | :--- | :--- |
+| **`canopy-steward`** | [`.agents/agents/canopy-steward.md`](./.agents/agents/canopy-steward.md) | Dedicated CanopyCrew development & compliance steward. Strictly enforces 4-lane ownership, UN SDG 11.7 mission, São Paulo municipal botanical compliance (*Portaria SVMA nº 26/2024*, *BioSampa*, *PMAU*), wire-safety invariants, `$0` cloud budget, and Conventional Commits / PR standards. |
+
+

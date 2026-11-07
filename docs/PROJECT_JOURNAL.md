@@ -72,15 +72,15 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Security (`@Idris`):** Exposes purely read-only endpoints returning static Pydantic-validated botanical catalogs (`ConfigDict(extra="forbid")`) with zero database queries and no credential requirements.
 - **Verification:** `pytest -v` (`18 passed` across health, site archetypes, wire safety, and species catalog endpoints).
 
-### [2026-11-07] — feat(backend): add non-root containerization, isolated GCP project, and security architecture (`feature/backend-cloud-run-deployment`)
-- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering & Cloud Cybersecurity coverage)
+### [2026-11-07] — feat(backend): add non-root containerization, isolated GCP project, security architecture, and NVIDIA NIM care narrative (`feature/backend-cloud-run-deployment`)
+- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering & Cloud Cybersecurity coverage) & Laurine Ndanu Nzuki (AI Research / Lead)
 - **Changes Delivered:**
-  - Added hardened containerization files `backend/Dockerfile` (running as unprivileged `USER appuser` on `python:3.12-slim` with dynamic `PORT=8080` binding), `backend/.dockerignore`, and `backend/.gcloudignore`.
-  - Provisioned isolated Google Cloud project `canopycrew-sp-mvp` and deployed `canopycrew-api` (`https://canopycrew-api-sb77peq6bq-uc.a.run.app`) in Always Free Tier region `us-central1` (`--min-instances 0 --max-instances 2 --memory 512Mi --cpu 1`) under dedicated runtime service account `canopycrew-runtime`.
-  - Authored `docs/SECURITY.md` documenting IAM least-privilege separation between Cloud Build and `canopycrew-runtime`, `SecretStr` + Google Secret Manager isolation for `NVIDIA_API_KEY`, CORS lockdown, and deterministic AI safety guardrails.
+  - Added hardened containerization files `backend/Dockerfile` (running as unprivileged `USER appuser` on `python:3.12-slim` with dynamic `PORT=8080` binding), `backend/.dockerignore`, and `backend/.gcloudignore`, and deployed `canopycrew-api` (`https://canopycrew-api-sb77peq6bq-uc.a.run.app`) inside isolated Google Cloud project `canopycrew-sp-mvp` (`us-central1` Always Free Tier, `--min-instances 0 --max-instances 2`) under least-privilege service account `canopycrew-runtime`.
+  - Implemented the asynchronous NVIDIA NIM care narrative layer (`backend/app/agent/nim_client.py`, `prompts.py`, `narrative.py`) with deterministic Portuguese fallback (`build_fallback_narrative()`), wired `care_narrative` into `POST /api/v1/volunteer-plan?include_narrative=true` and `POST /api/v1/volunteer-plan/narrative`, and added unit/endpoint tests (`backend/tests/test_agent.py`).
+  - Authored `docs/SECURITY.md` and `.agents/agents/canopy-steward.md` (indexed in `AGENTS.md`), documenting keyless IAM separation, `SecretStr` + Google Secret Manager isolation for `NVIDIA_API_KEY`, CORS lockdown, and deterministic AI safety guardrails.
 - **Cross-Lane Unblocks:**
-  - **Frontend (`@Laurine`):** Live public HTTPS endpoint (`https://canopycrew-api-sb77peq6bq-uc.a.run.app`) with wildcard `*.run.app` + `localhost:5173` CORS support.
-  - **Product Brief (`@Barbara`):** Supplies verified `$0` Always Free Tier architecture and security compliance documentation for rubric Pillar 3 & Pillar 4.
+  - **Frontend (`@Laurine`):** Live public HTTPS endpoint (`https://canopycrew-api-sb77peq6bq-uc.a.run.app`) with wildcard `*.run.app` + `localhost:5173` CORS support, plus `care_narrative` response field on `/api/v1/volunteer-plan/narrative` and `/api/v1/volunteer-plan?include_narrative=true`.
+  - **Product Brief (`@Barbara`):** Supplies verified `$0` Always Free Tier Google Cloud Run + NVIDIA NIM (`meta/llama-3.1-70b-instruct`) architecture and security compliance documentation for rubric Pillar 3 & Pillar 4.
   - **Security (`@Idris`):** Completes `docs/SECURITY.md` deliverable with non-root container hardening, runtime vs. build IAM separation, and strict Pydantic `extra="forbid"` input validation.
-- **Verification:** Verified live Cloud Run revision `canopycrew-api-00001-fv6` serving 100% traffic at `https://canopycrew-api-sb77peq6bq-uc.a.run.app`, `Dockerfile` non-root user configuration, and pre-commit secret/budget guardrails.
+- **Verification:** Verified live Cloud Run revision `canopycrew-api-00001-fv6` at `https://canopycrew-api-sb77peq6bq-uc.a.run.app`, `test_agent.py` unit/endpoint coverage for NVIDIA NIM and deterministic fallback, and pre-commit secret/budget guardrails.
 

@@ -94,11 +94,14 @@ backend/
 ├── app/
 │   ├── main.py                  # FastAPI app initialization, router mounting, CORS policy
 │   ├── agent/                   # Laurine: NVIDIA NIM prompt templates & narrative synthesis
+│   │   ├── nim_client.py        # Async httpx client for NVIDIA NIM API (meta/llama-3.1-70b-instruct)
+│   │   ├── prompts.py           # Portuguese SDG 11.7 & wire-safety prompt templates
+│   │   └── narrative.py         # Care narrative synthesis with deterministic fallback
 │   ├── api/routes/
 │   │   ├── health.py            # GET /, GET /health, GET /api/v1/health
 │   │   ├── sites.py             # GET /api/v1/sites, GET /api/v1/sites/{site_id}
 │   │   ├── species.py           # GET /api/v1/species, GET /api/v1/species/{species_id}
-│   │   └── plans.py             # GET /api/v1/recommendations, POST /api/v1/volunteer-plan
+│   │   └── plans.py             # GET /api/v1/recommendations, POST /api/v1/volunteer-plan, POST /api/v1/volunteer-plan/narrative
 │   ├── core/
 │   │   └── config.py            # pydantic-settings env loader (SecretStr for NVIDIA_API_KEY)
 │   ├── schemas/
@@ -110,7 +113,8 @@ backend/
 │   └── species.json             # 10 verified native Atlantic Forest species
 ├── tests/
 │   ├── test_health.py           # Health probe tests
-│   └── test_endpoints.py        # Site, recommendation, wire-safety & plan math unit tests
+│   ├── test_endpoints.py        # Site, recommendation, wire-safety & plan math unit tests
+│   └── test_agent.py            # NVIDIA NIM client, prompt, and fallback unit/endpoint tests
 ├── pytest.ini
 └── requirements.txt             # Pinned lightweight Python 3.12.7 dependencies
 ```
@@ -140,7 +144,8 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 | `GET` | `/api/v1/species` | `species.list_species` | `200` | Returns all 10 verified native Atlantic Forest `NativeSpecies` objects. |
 | `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404` | Returns a single `NativeSpecies` by `species_id` or `404` if unknown. |
 | `GET` | `/api/v1/recommendations?site_id=...` | `plans.recommend_species` | `200`, `404`, `422` | Deterministically filters the 10-species catalog for municipal wire safety and site suitability. |
-| `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), and volunteer care tasks. |
+| `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), volunteer care tasks, and optional `?include_narrative=true` care narrative. |
+| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic Portuguese fallback when unconfigured). |
 
 ---
 

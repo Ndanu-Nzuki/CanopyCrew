@@ -184,7 +184,9 @@ erDiagram
   - `site-b-sunny-lot` (**9**): `eugenia-uniflora`, `schinus-terebinthifolia`, `pleroma-mutabile`, `cecropia-pachystachya`, `calliandra-tweediei`, `campomanesia-phaea`, `psidium-cattleianum`, `bromelia-antiacantha`, `salvia-splendens`
   - `site-c-shaded-courtyard` (**5**): `eugenia-uniflora`, `pleroma-mutabile`, `campomanesia-phaea`, `myrcia-glabra`, `salvia-splendens`
 
-### 4.5 Volunteer Plan Calculation — `POST /api/v1/volunteer-plan`
+### 4.5 Volunteer Plan Calculation — `POST /api/v1/volunteer-plan` & `POST /api/v1/volunteer-plan/narrative`
+
+- **Optional Query Parameter on `POST /api/v1/volunteer-plan`:** `include_narrative` (`boolean`, default `false`). When `true` (or when calling `POST /api/v1/volunteer-plan/narrative`), `care_narrative` is populated via `generate_volunteer_care_narrative()` using NVIDIA NIM (`meta/llama-3.1-70b-instruct`) with deterministic Portuguese fallback (`build_fallback_narrative()`).
 
 #### Request Body (`VolunteerPlanRequest`)
 | Field | Type | Validation | Description |
@@ -244,7 +246,8 @@ erDiagram
         "notes": "Follow PMAU pruning standards; never top the central leader."
       }
     ]
-  }
+  },
+  "care_narrative": null
 }
 ```
 

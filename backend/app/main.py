@@ -11,7 +11,7 @@ settings = get_settings()
 
 # Explicitly ensure Vite dev server (http://localhost:5173) and production Cloud Run
 # domains (*.run.app + any configured CORS_ORIGINS) are permitted.
-ALLOWED_ORIGINS = list(dict.fromkeys(["http://localhost:5173", *settings.cors_origins]))
+ALLOWED_ORIGINS = list(dict.fromkeys(["http://localhost:5173","https://canopycrew-sp-mvp.web.app", *settings.cors_origins]))
 
 app = FastAPI(
     title=settings.app_name,

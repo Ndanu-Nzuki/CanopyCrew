@@ -1,5 +1,5 @@
 import Icon from "./Icon";
-import siteImages from "../data/siteimages";
+import { getSiteImage } from "../data/siteimages";
 
 const sunlightNames = {
   full_sun: "full sun",
@@ -111,13 +111,7 @@ export default function SiteDetail({
   const goals = site.ecological_goals || [];
   const dimensions = site.constraints;
 
-  const siteIndex = site.site_id.includes("sidewalk")
-    ? 0
-    : site.site_id.includes("sunny")
-      ? 1
-      : 2;
-
-  const image = siteImages[siteIndex];
+  const image = getSiteImage(site);
 
   return (
     <section className="site-detail">

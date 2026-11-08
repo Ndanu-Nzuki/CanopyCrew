@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
+import { getPlantImage } from "../data/plantimages";
 
 function SectionHeading({ eyebrow, title, copy }) {
   return (
@@ -31,27 +32,15 @@ function sunlightLabel(values) {
   ].join(", ");
 }
 
-function plantImage(plant) {
-  const images = [
-    "https://images.unsplash.com/photo-1684651508422-b28a30cfde91?auto=format&fit=crop&w=800&q=82",
-    "https://images.unsplash.com/photo-1558462192-f9a70c31a945?auto=format&fit=crop&w=800&q=82",
-    "https://images.unsplash.com/photo-1687205931274-a28f08a015b5?auto=format&fit=crop&w=800&q=82",
-  ];
-  const hash = [...plant.species_id].reduce(
-    (total, char) => total + char.charCodeAt(0),
-    0,
-  );
-  return images[hash % images.length];
-}
-
-function PlantCard({ plant }) {
+function PlantCard({ plant, index }) {
   const type = plant.physical_profile.growth_habit.replaceAll("_", " ");
   return (
     <article className="plant-card">
       <div className="plant-image">
         <img
-          src={plantImage(plant)}
+          src={getPlantImage(plant, index)}
           alt={`Native plant: ${plant.botanical.common_name_en}`}
+          loading="lazy"
         />
         <span>{type}</span>
       </div>
@@ -199,8 +188,12 @@ export default function PlantCatalogue({ plants, status }) {
             </div>
             {filtered.length ? (
               <div className="plant-grid">
-                {filtered.map((plant) => (
-                  <PlantCard plant={plant} key={plant.species_id} />
+                {filtered.map((plant, index) => (
+                  <PlantCard
+                    plant={plant}
+                    index={index}
+                    key={plant.species_id}
+                  />
                 ))}
               </div>
             ) : (

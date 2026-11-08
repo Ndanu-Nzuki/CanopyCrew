@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "./Icon";
-import siteImages from "../data/siteimages";
+import { getSiteImage } from "../data/siteimages";
 
 const sunlightNames = {
   full_sun: "full sun",
@@ -201,57 +201,55 @@ export default function SiteDetail({
   const goals = site.ecological_goals || [];
   const dimensions = site.constraints;
 
-  const defaultSpeciesIds = recommendations.map((plant) => plant.species_id);
-  const [customSelection, setCustomSelection] = useState(null);
-  const [planResult, setPlanResult] = useState(null);
-  const [planStatus, setPlanStatus] = useState("idle");
-  const [planError, setPlanError] = useState("");
+const defaultSpeciesIds = recommendations.map((plant) => plant.species_id);
 
-  const selectedSpeciesIds = customSelection ?? defaultSpeciesIds;
+const [customSelection, setCustomSelection] = useState(null);
+const [planResult, setPlanResult] = useState(null);
+const [planStatus, setPlanStatus] = useState("idle");
+const [planError, setPlanError] = useState("");
 
-  const toggleSpeciesSelection = (speciesId) => {
-    setCustomSelection((current) => {
-      const base = current ?? defaultSpeciesIds;
-      return base.includes(speciesId)
-        ? base.filter((id) => id !== speciesId)
-        : [...base, speciesId];
+const selectedSpeciesIds = customSelection ?? defaultSpeciesIds;
+
+const toggleSpeciesSelection = (speciesId) => {
+  setCustomSelection((current) => {
+    const base = current ?? defaultSpeciesIds;
+
+    return base.includes(speciesId)
+      ? base.filter((id) => id !== speciesId)
+      : [...base, speciesId];
+  });
+};
+
+const submitVolunteerPlan = async (withNarrative) => {
+  if (!onPostPlan || selectedSpeciesIds.length === 0) return;
+
+  setPlanStatus(withNarrative ? "loading-narrative" : "loading-math");
+  setPlanError("");
+
+  const endpoint = withNarrative
+    ? "/api/v1/volunteer-plan/narrative"
+    : "/api/v1/volunteer-plan";
+
+  try {
+    const response = await onPostPlan(endpoint, {
+      site_id: site.site_id,
+      selected_species_ids: selectedSpeciesIds,
     });
-  };
 
-  const submitVolunteerPlan = async (withNarrative) => {
-    if (!onPostPlan || selectedSpeciesIds.length === 0) return;
+    setPlanResult(response);
+    setPlanStatus("ready");
+  } catch (error) {
+    setPlanError(
+      error instanceof Error
+        ? error.message
+        : "Could not generate volunteer plan.",
+    );
 
-    setPlanStatus(withNarrative ? "loading-narrative" : "loading-math");
-    setPlanError("");
+    setPlanStatus("error");
+  }
+};
 
-    const endpoint = withNarrative
-      ? "/api/v1/volunteer-plan/narrative"
-      : "/api/v1/volunteer-plan";
-
-    try {
-      const response = await onPostPlan(endpoint, {
-        site_id: site.site_id,
-        selected_species_ids: selectedSpeciesIds,
-      });
-      setPlanResult(response);
-      setPlanStatus("ready");
-    } catch (error) {
-      setPlanError(
-        error instanceof Error
-          ? error.message
-          : "Could not generate volunteer plan.",
-      );
-      setPlanStatus("error");
-    }
-  };
-
-  const siteIndex = site.site_id.includes("sidewalk")
-    ? 0
-    : site.site_id.includes("sunny")
-      ? 1
-      : 2;
-
-  const image = siteImages[siteIndex];
+const image = getSiteImage(site);
 
   return (
     <section className="site-detail">

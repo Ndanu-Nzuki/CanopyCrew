@@ -1,6 +1,6 @@
 
 import Icon from "./Icon";
-import siteImages from "../data/siteimages";
+import { getSiteImage } from "../data/siteimages";
 
 function SectionHeading({ eyebrow, title, copy, action }) {
   return (
@@ -20,7 +20,7 @@ function SectionHeading({ eyebrow, title, copy, action }) {
 }
 
 function SiteCard({ site, index }) {
-  const image = siteImages[index % siteImages.length];
+  const image = getSiteImage(site, index);
   const light = site.sunlight_exposure.replaceAll("_", " ");
 
   return (
@@ -32,6 +32,7 @@ function SiteCard({ site, index }) {
         <img
           src={image}
           alt={`${site.archetype_label} planting site`}
+          loading="lazy"
         />
         <span className="site-number">0{index + 1}</span>
         <span className="distance">

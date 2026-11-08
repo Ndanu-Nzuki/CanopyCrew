@@ -9,13 +9,42 @@ import SiteDetail from "./components/sitedetail";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/+$/, "");
+).replace(/\/+(?:api\/v1\/?)?$/, "");
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE_URL}${path}`);
 
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
+  }
+
+  return response.json();
+}
+
+async function postJson(path, body) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.detail) {
+        detail =
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : JSON.stringify(errorData.detail);
+      }
+    } catch {
+      // Keep default status error message when body is not JSON
+    }
+    throw new Error(detail);
   }
 
   return response.json();
@@ -186,12 +215,14 @@ export default function App() {
         {activeSiteId ? (
           activeSite ? (
             <SiteDetail
+              key={activeSite.site_id}
               site={activeSite}
               recommendations={recommendationsBySite[activeSiteId] || []}
               status={
                 recommendationsStatusBySite[activeSiteId] || "loading"
               }
               onBack={goBack}
+              onPostPlan={postJson}
             />
           ) : (
             <section className="section site-detail">

@@ -94,8 +94,8 @@ backend/
 ├── app/
 │   ├── main.py                  # FastAPI app initialization, router mounting, CORS policy
 │   ├── agent/                   # Laurine: NVIDIA NIM prompt templates & narrative synthesis
-│   │   ├── nim_client.py        # Async httpx client for NVIDIA NIM API (meta/llama-3.1-70b-instruct)
-│   │   ├── prompts.py           # Portuguese SDG 11.7 & wire-safety prompt templates
+│   │   ├── nim_client.py        # Async httpx client for NVIDIA NIM API (nvidia/nemotron-3-ultra-550b-a55b)
+│   │   ├── prompts.py           # English SDG 11.7 & wire-safety prompt templates with PT-BR botanical names
 │   │   └── narrative.py         # Care narrative synthesis with deterministic fallback
 │   ├── api/routes/
 │   │   ├── health.py            # GET /, GET /health, GET /api/v1/health
@@ -145,7 +145,7 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 | `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404` | Returns a single `NativeSpecies` by `species_id` or `404` if unknown. |
 | `GET` | `/api/v1/recommendations?site_id=...` | `plans.recommend_species` | `200`, `404`, `422` | Deterministically filters the 10-species catalog for municipal wire safety and site suitability. |
 | `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), volunteer care tasks, and optional `?include_narrative=true` care narrative. |
-| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic Portuguese fallback when unconfigured). |
+| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic English fallback when unconfigured). |
 
 ---
 

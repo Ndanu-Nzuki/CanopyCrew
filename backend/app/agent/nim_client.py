@@ -6,6 +6,7 @@ Injects credentials strictly via environment variables / Google Secret Manager.
 """
 
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -13,6 +14,18 @@ import httpx
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger("canopycrew.agent.nim")
+
+_NVAPI_TOKEN_PATTERN = re.compile(r"nvapi-[A-Za-z0-9_\-]+")
+
+
+def _redact_secret(text: str, raw_key: Optional[str] = None) -> str:
+    """Scrub any NVIDIA API key or Bearer token from error and log strings."""
+    if not text:
+        return text
+    sanitized = _NVAPI_TOKEN_PATTERN.sub("nvapi-[REDACTED]", text)
+    if raw_key and raw_key.strip():
+        sanitized = sanitized.replace(raw_key.strip(), "[REDACTED]")
+    return sanitized
 
 
 class NIMClientError(Exception):
@@ -28,10 +41,7 @@ class NIMClient:
     @property
     def is_configured(self) -> bool:
         """Return True if NVIDIA API key is available."""
-        return (
-            self._settings.nvidia_api_key is not None
-            and bool(self._settings.nvidia_api_key.get_secret_value().strip())
-        )
+        return self._settings.has_nvidia_api_key
 
     @property
     def base_url(self) -> str:
@@ -45,14 +55,14 @@ class NIMClient:
         """Model identifier for NIM inference."""
         if self._settings.nvidia_model and self._settings.nvidia_model.strip():
             return self._settings.nvidia_model.strip()
-        return "meta/llama-3.1-70b-instruct"
+        return "nvidia/nemotron-3-ultra-550b-a55b"
 
     async def generate_completion(
         self,
         system_prompt: str,
         user_prompt: str,
         temperature: float = 0.2,
-        max_tokens: int = 1024,
+        max_tokens: int = 800,
     ) -> str:
         """Call NVIDIA NIM chat completions API and return text response."""
         if not self.is_configured:
@@ -78,17 +88,29 @@ class NIMClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(endpoint, json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
                 choices = data.get("choices", [])
                 if not choices:
                     raise NIMClientError("NVIDIA NIM response contained no choices.")
-                return choices[0]["message"]["content"]
+                message = choices[0].get("message", {})
+                content = message.get("content") or message.get("reasoning_content")
+                if not content or not str(content).strip():
+                    raise NIMClientError("NVIDIA NIM response contained empty message content.")
+                return str(content).strip()
         except httpx.HTTPStatusError as exc:
-            logger.error("NVIDIA NIM returned HTTP %s: %s", exc.response.status_code, exc.response.text)
-            raise NIMClientError(f"NVIDIA NIM HTTP error {exc.response.status_code}: {exc.response.text}") from exc
+            safe_body = _redact_secret(exc.response.text, api_key)
+            logger.error(
+                "NVIDIA NIM returned HTTP %s: %s",
+                exc.response.status_code,
+                safe_body,
+            )
+            raise NIMClientError(
+                f"NVIDIA NIM HTTP error {exc.response.status_code}: {safe_body}"
+            ) from None
         except httpx.RequestError as exc:
-            logger.error("NVIDIA NIM network error: %s", exc)
-            raise NIMClientError(f"NVIDIA NIM connection error: {exc}") from exc
+            safe_err = _redact_secret(str(exc), api_key)
+            logger.error("NVIDIA NIM network error: %s", safe_err)
+            raise NIMClientError(f"NVIDIA NIM connection error: {safe_err}") from None

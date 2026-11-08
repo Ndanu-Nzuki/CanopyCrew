@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Icon from "./Icon";
 import { getSiteImage } from "../data/siteimages";
 
@@ -38,7 +39,80 @@ function CareSchedule({ plant }) {
   );
 }
 
-function PlantRecommendation({ plant, site }) {
+function NarrativeBlock({ narrative }) {
+  if (!narrative) return null;
+
+  const blocks = narrative
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="nim-narrative-card">
+      <div className="nim-narrative-header">
+        <div>
+          <p className="eyebrow">
+            <span /> NVIDIA NIM · Read-Only Narrative Synthesis
+          </p>
+          <h3>Community Volunteer Care & Planting Guide</h3>
+        </div>
+        <span className="nim-model-badge">
+          NVIDIA NIM · nvidia/nemotron-3-ultra-550b-a55b · UN SDG 11.7
+        </span>
+      </div>
+
+      <div className="nim-narrative-body" lang="en">
+        {blocks.map((block, index) => {
+          if (block === "---") {
+            return <hr key={index} className="nim-divider" />;
+          }
+          if (block.startsWith("# ")) {
+            return <h4 key={index}>{block.slice(2)}</h4>;
+          }
+          if (block.startsWith("## ")) {
+            return <h5 key={index}>{block.slice(3)}</h5>;
+          }
+          if (block.startsWith("### ")) {
+            return <h6 key={index}>{block.slice(4)}</h6>;
+          }
+          if (block.startsWith(">")) {
+            const cleanAlert = block
+              .split("\n")
+              .map((line) => line.replace(/^>\s*(\[!IMPORTANT\])?\s*/, ""))
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <div key={index} className="nim-callout">
+                <Icon name="leaf" size={17} />
+                <p>{cleanAlert.replaceAll("**", "")}</p>
+              </div>
+            );
+          }
+          if (block.startsWith("- ") || block.startsWith("* ")) {
+            const items = block
+              .split("\n")
+              .map((line) => line.replace(/^\s*[-*]\s+/, "").trim())
+              .filter(Boolean);
+            return (
+              <ul key={index} role="list" className="nim-list">
+                {items.map((item, idx) => (
+                  <li key={idx}>{item.replaceAll("**", "").replaceAll("*", "")}</li>
+                ))}
+              </ul>
+            );
+          }
+          return (
+            <p key={index}>
+              {block.replaceAll("**", "").replaceAll("*", "")}
+            </p>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PlantRecommendation({ plant, site, isSelected, onToggleSelect }) {
   const exposure =
     sunlightNames[site.sunlight_exposure] ||
     site.sunlight_exposure.replaceAll("_", " ");
@@ -63,15 +137,30 @@ function PlantRecommendation({ plant, site }) {
           </p>
         </div>
 
-        <span className="plant-height">
-          {plant.physical_profile.mature_height_meters} m mature height
-        </span>
+        <div className="detail-plant-actions">
+          <span className="plant-height">
+            {plant.physical_profile.mature_height_meters} m · $
+            {plant.estimates.unit_cost_usd.toFixed(2)} USD ·{" "}
+            {plant.estimates.canopy_coverage_m2_at_year_3} m² Yr-3
+          </span>
+
+          <button
+            type="button"
+            className="plant-select-toggle"
+            aria-pressed={isSelected}
+            aria-label={`Include ${plant.botanical.common_name_en} in volunteer planting plan`}
+            onClick={() => onToggleSelect(plant.species_id)}
+          >
+            <Icon name="leaf" size={15} />
+            <span>Include in planting plan</span>
+          </button>
+        </div>
       </div>
 
       <div className="suitability">
         <h4>Why it suits this site</h4>
 
-        <ul>
+        <ul role="list">
           <li>
             <Icon name="leaf" size={16} /> Selected by CanopyCrew's backend
             for the {site.archetype_label} archetype.
@@ -91,7 +180,7 @@ function PlantRecommendation({ plant, site }) {
             <li>
               <Icon name="leaf" size={16} /> Overhead wire safety: this
               species has passed the backend's site-specific safety
-              screening.
+              screening (≤ 5.0 m).
             </li>
           )}
         </ul>
@@ -107,11 +196,60 @@ export default function SiteDetail({
   recommendations,
   status,
   onBack,
+  onPostPlan,
 }) {
   const goals = site.ecological_goals || [];
   const dimensions = site.constraints;
 
-  const image = getSiteImage(site);
+const defaultSpeciesIds = recommendations.map((plant) => plant.species_id);
+
+const [customSelection, setCustomSelection] = useState(null);
+const [planResult, setPlanResult] = useState(null);
+const [planStatus, setPlanStatus] = useState("idle");
+const [planError, setPlanError] = useState("");
+
+const selectedSpeciesIds = customSelection ?? defaultSpeciesIds;
+
+const toggleSpeciesSelection = (speciesId) => {
+  setCustomSelection((current) => {
+    const base = current ?? defaultSpeciesIds;
+
+    return base.includes(speciesId)
+      ? base.filter((id) => id !== speciesId)
+      : [...base, speciesId];
+  });
+};
+
+const submitVolunteerPlan = async (withNarrative) => {
+  if (!onPostPlan || selectedSpeciesIds.length === 0) return;
+
+  setPlanStatus(withNarrative ? "loading-narrative" : "loading-math");
+  setPlanError("");
+
+  const endpoint = withNarrative
+    ? "/api/v1/volunteer-plan/narrative"
+    : "/api/v1/volunteer-plan";
+
+  try {
+    const response = await onPostPlan(endpoint, {
+      site_id: site.site_id,
+      selected_species_ids: selectedSpeciesIds,
+    });
+
+    setPlanResult(response);
+    setPlanStatus("ready");
+  } catch (error) {
+    setPlanError(
+      error instanceof Error
+        ? error.message
+        : "Could not generate volunteer plan.",
+    );
+
+    setPlanStatus("error");
+  }
+};
+
+const image = getSiteImage(site);
 
   return (
     <section className="site-detail">
@@ -156,7 +294,7 @@ export default function SiteDetail({
           <div>
             <span>Overhead power lines</span>
             <strong>
-              {dimensions.overhead_power_lines ? "Present" : "None"}
+              {dimensions.overhead_power_lines ? "Present (≤ 5.0 m)" : "None"}
             </strong>
           </div>
 
@@ -177,7 +315,7 @@ export default function SiteDetail({
             <h2>What this space can support</h2>
           </div>
 
-          <ul>
+          <ul role="list">
             {goals.map((goal) => (
               <li key={goal}>
                 <Icon name="leaf" size={17} />
@@ -186,6 +324,122 @@ export default function SiteDetail({
             ))}
           </ul>
         </section>
+
+        {status === "ready" && recommendations.length > 0 && (
+          <section className="volunteer-plan-builder">
+            <div className="detail-section-heading">
+              <div>
+                <p className="eyebrow">
+                  <span /> Deterministic Math + NVIDIA NIM Stewardship
+                </p>
+                <h2>Build your community planting plan</h2>
+              </div>
+              <p>
+                Botanical compliance (Portaria SVMA nº 26/2024 & PMAU), wire
+                safety, seedling costs, and Year-3 canopy projections are
+                calculated deterministically in Python. NVIDIA NIM synthesizes
+                the community volunteer care narrative.
+              </p>
+            </div>
+
+            <div className="plan-builder-bar">
+              <div className="plan-selection-summary">
+                <strong>{selectedSpeciesIds.length}</strong> of{" "}
+                {recommendations.length} eligible native species selected
+                <div className="plan-quick-links">
+                  <button
+                    type="button"
+                    className="clear-button"
+                    onClick={() => setCustomSelection(null)}
+                  >
+                    Select all ({recommendations.length})
+                  </button>
+                  {selectedSpeciesIds.length > 0 && (
+                    <button
+                      type="button"
+                      className="clear-button"
+                      onClick={() => setCustomSelection([])}
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="plan-builder-actions">
+                <button
+                  type="button"
+                  className="button button-small"
+                  disabled={
+                    selectedSpeciesIds.length === 0 ||
+                    planStatus.startsWith("loading")
+                  }
+                  onClick={() => submitVolunteerPlan(false)}
+                >
+                  {planStatus === "loading-math"
+                    ? "Calculating plan…"
+                    : "Calculate deterministic plan"}
+                </button>
+
+                <button
+                  type="button"
+                  className="button button-earth"
+                  disabled={
+                    selectedSpeciesIds.length === 0 ||
+                    planStatus.startsWith("loading")
+                  }
+                  onClick={() => submitVolunteerPlan(true)}
+                >
+                  <Icon name="leaf" size={16} />
+                  {planStatus === "loading-narrative"
+                    ? "Synthesizing with NVIDIA NIM…"
+                    : "Generate NVIDIA NIM care guide"}
+                </button>
+              </div>
+            </div>
+
+            {planStatus === "error" && (
+              <p className="api-state" role="alert">
+                {planError}
+              </p>
+            )}
+
+            {planResult && (
+              <div className="plan-results" aria-live="polite">
+                <div className="plan-metrics">
+                  <div>
+                    <span>Selected native seedlings</span>
+                    <strong>{planResult.selected_species_count} species</strong>
+                  </div>
+                  <div>
+                    <span>Estimated seedling cost</span>
+                    <strong>
+                      ${planResult.total_seedling_cost_usd.toFixed(2)} USD
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Projected Year-3 canopy</span>
+                    <strong>
+                      {planResult.projected_canopy_m2_year_3.toFixed(1)} m²
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Municipal screening</span>
+                    <strong>
+                      {dimensions.overhead_power_lines
+                        ? "Wire-safe (≤ 5.0 m)"
+                        : "SVMA 26/2024 verified"}
+                    </strong>
+                  </div>
+                </div>
+
+                {planResult.care_narrative && (
+                  <NarrativeBlock narrative={planResult.care_narrative} />
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="site-recommendations">
           <div className="detail-section-heading">
@@ -199,7 +453,8 @@ export default function SiteDetail({
 
             <p>
               Recommendations follow the site's growing conditions and
-              safety requirements.
+              safety requirements. Toggle any card to customize your
+              volunteer planting plan above.
             </p>
           </div>
 
@@ -217,6 +472,8 @@ export default function SiteDetail({
                   key={plant.species_id}
                   plant={plant}
                   site={site}
+                  isSelected={selectedSpeciesIds.includes(plant.species_id)}
+                  onToggleSelect={toggleSpeciesSelection}
                 />
               ))}
             </div>

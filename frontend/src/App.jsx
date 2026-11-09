@@ -7,6 +7,8 @@ import Navbar from "./components/navbar";
 import PlantCatalogue from "./components/plantcatalogue";
 import SiteDetail from "./components/sitedetail";
 import MyWorkspace from "./components/MyWorkspace";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebase/config";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1"
@@ -62,13 +64,19 @@ export default function App() {
   const [sitesStatus, setSitesStatus] = useState("loading");
   const [plantsStatus, setPlantsStatus] = useState("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [workspaceEmail, setWorkspaceEmail] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("canopycrew.demo.account"))?.email || "";
-    } catch {
-      return "";
-    }
+  const [currentUser, setCurrentUser] = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+
+const workspaceEmail = currentUser?.email || "";
+
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    setCurrentUser(user);
+    setAuthLoading(false);
   });
+
+  return unsubscribe;
+}, []);
 
   const [activeSiteId, setActiveSiteId] = useState(() => {
     const match = window.location.hash.match(/^#site\/(.+)$/);
@@ -228,10 +236,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const signOutWorkspace = () => {
-    localStorage.removeItem("canopycrew.demo.account");
-    setWorkspaceEmail("");
-  };
+  const signOutWorkspace = async () => {
+  try {
+    await signOut(auth);
+    setWorkspaceOpen(false);
+  } catch (error) {
+    console.error("Unable to sign out:", error);
+  }
+};
 
   const activeSite = sites.find(
     (site) => site.site_id === activeSiteId,
@@ -241,12 +253,20 @@ export default function App() {
     <>
       <Navbar onWorkspace={() => setWorkspaceOpen(true)} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateFromWorkspace} onHome={goHome} workspaceOpen={workspaceOpen} />
 
-      {workspaceOpen ? <MyWorkspace
-        sites={sites}
-        recommendationsBySite={recommendationsBySite}
-        email={workspaceEmail}
-        onEmailChange={setWorkspaceEmail}
-      /> : <>
+      {workspaceOpen ? (
+  authLoading ? (
+    <main className="workspace-page">
+      <p>Checking your session...</p>
+    </main>
+  ) : (
+    <MyWorkspace
+      sites={sites}
+      recommendationsBySite={recommendationsBySite}
+      email={workspaceEmail}
+    />
+  )
+) : (
+  <>
 
       <main>
         {activeSiteId ? (
@@ -287,7 +307,8 @@ export default function App() {
       </main>
 
       {!activeSiteId && <Footer onHome={goHome} onWorkspace={() => setWorkspaceOpen(true)} />}
-      </>}
+      </>)
+      }
     </>
   );
 }

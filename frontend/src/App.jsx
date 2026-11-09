@@ -6,6 +6,7 @@ import Hero from "./components/hero";
 import Navbar from "./components/navbar";
 import PlantCatalogue from "./components/plantcatalogue";
 import SiteDetail from "./components/sitedetail";
+import MyWorkspace from "./components/MyWorkspace";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1"
@@ -60,6 +61,14 @@ export default function App() {
 
   const [sitesStatus, setSitesStatus] = useState("loading");
   const [plantsStatus, setPlantsStatus] = useState("loading");
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceEmail, setWorkspaceEmail] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("canopycrew.demo.account"))?.email || "";
+    } catch {
+      return "";
+    }
+  });
 
   const [activeSiteId, setActiveSiteId] = useState(() => {
     const match = window.location.hash.match(/^#site\/(.+)$/);
@@ -203,13 +212,41 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const navigateFromWorkspace = (event, sectionId) => {
+    if (!workspaceOpen && !activeSiteId) return;
+    event.preventDefault();
+    setWorkspaceOpen(false);
+    setActiveSiteId(null);
+    window.history.replaceState({ canopyCrewHome: true }, "", `#${sectionId}`);
+    window.setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }), 0);
+  };
+
+  const goHome = () => {
+    setWorkspaceOpen(false);
+    setActiveSiteId(null);
+    window.history.replaceState({ canopyCrewHome: true }, "", "#top");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const signOutWorkspace = () => {
+    localStorage.removeItem("canopycrew.demo.account");
+    setWorkspaceEmail("");
+  };
+
   const activeSite = sites.find(
     (site) => site.site_id === activeSiteId,
   );
 
   return (
     <>
-      <Navbar />
+      <Navbar onWorkspace={() => setWorkspaceOpen(true)} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateFromWorkspace} onHome={goHome} workspaceOpen={workspaceOpen} />
+
+      {workspaceOpen ? <MyWorkspace
+        sites={sites}
+        recommendationsBySite={recommendationsBySite}
+        email={workspaceEmail}
+        onEmailChange={setWorkspaceEmail}
+      /> : <>
 
       <main>
         {activeSiteId ? (
@@ -249,7 +286,8 @@ export default function App() {
         )}
       </main>
 
-      {!activeSiteId && <Footer />}
+      {!activeSiteId && <Footer onHome={goHome} onWorkspace={() => setWorkspaceOpen(true)} />}
+      </>}
     </>
   );
 }

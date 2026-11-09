@@ -2,40 +2,39 @@ import { useState } from "react";
 import Icon from "./Icon";
 import Logo from "./Logo";
 
-export default function Navbar() {
+export default function Navbar({ onWorkspace, onSignOut, signedIn = false, onNavigate, onHome, workspaceOpen = false }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return (
-    <header className="navbar">
+    <header className={workspaceOpen ? "navbar workspace-navbar" : "navbar"}>
       <div className="nav-inner">
-        <Logo />
+        <Logo onHome={onHome} />
         <nav
           className={open ? "nav-links open" : "nav-links"}
           aria-label="Primary navigation"
         >
-          <a href="#discover" onClick={close}>
+          <a href="#discover" onClick={(event) => { close(); onNavigate?.(event, "discover"); }}>
             Discover
           </a>
-          <a href="#plants" onClick={close}>
+          <a href="#plants" onClick={(event) => { close(); onNavigate?.(event, "plants"); }}>
             Plant catalogue
           </a>
-          <a href="#about" onClick={close}>
+          <a href="#about" onClick={(event) => { close(); onNavigate?.(event, "about"); }}>
             About us
           </a>
-          <a href="#contact" onClick={close}>
+          <a href="#contact" onClick={(event) => { close(); onNavigate?.(event, "contact"); }}>
             Contact
           </a>
-          <a
+          <button
             className="button button-small mobile-cta"
-            href="#discover"
-            onClick={close}
+            onClick={() => { close(); signedIn && workspaceOpen ? onSignOut() : onWorkspace(); }}
           >
-            MyWorkspace <Icon name="arrow" size={17} />
-          </a>
+            {signedIn && workspaceOpen ? "Sign out" : <>MyWorkspace <Icon name="arrow" size={17} /></>}
+          </button>
         </nav>
-        <a className="button button-small desktop-cta" href="#discover">
-          MyWorkspace <Icon name="arrow" size={17} />
-        </a>
+        <button className="button button-small desktop-cta" onClick={signedIn && workspaceOpen ? onSignOut : onWorkspace}>
+          {signedIn && workspaceOpen ? "Sign out" : <>MyWorkspace <Icon name="arrow" size={17} /></>}
+        </button>
         <button
           className="menu-button"
           onClick={() => setOpen(!open)}

@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 import { getPlantImage } from "../data/plantimages";
 import { getSiteImage } from "../data/siteimages";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { auth } from "../firebase/config";
 
-const ACCOUNT_KEY = "canopycrew.demo.account";
+
 const WORKSPACE_KEY = "canopycrew.demo.workspace";
 const taskTypes = ["Watering", "Mulching", "Compost", "Pruning"];
 
@@ -15,28 +20,65 @@ function readJson(key, fallback) {
   }
 }
 
-function AuthGate({ onDone }) {
+function AuthGate() {
   const [mode, setMode] = useState("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
-  const submit = (event) => {
-    event.preventDefault();
-    setError("");
-    const saved = readJson(ACCOUNT_KEY, null);
-    if (mode === "signup" && password !== confirm)
-      return setError("Your passwords do not match.");
-    if (mode === "login" && saved?.email !== email.trim().toLowerCase())
-      return setError(
-        "No demo account found for that email. Sign up to get started.",
+  const [loading, setLoading] = useState(false);
+  const submit = async (event) => {
+  event.preventDefault();
+  setError("");
+
+  if (mode === "signup" && password !== confirm) {
+    setError("Your passwords do not match.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (mode === "signup") {
+      await createUserWithEmailAndPassword(
+        auth,
+        normalizedEmail,
+        password,
       );
-    localStorage.setItem(
-      ACCOUNT_KEY,
-      JSON.stringify({ email: email.trim().toLowerCase() }),
+    } else {
+      await signInWithEmailAndPassword(
+        auth,
+        normalizedEmail,
+        password,
+      );
+    }
+  } catch (error) {
+    const messages = {
+      "auth/email-already-in-use":
+        "An account already exists with this email. Try logging in.",
+      "auth/invalid-email":
+        "Please enter a valid email address.",
+      "auth/weak-password":
+        "Your password is too weak. Please choose a stronger one.",
+      "auth/invalid-credential":
+        "Incorrect email or password. Please try again.",
+      "auth/user-disabled":
+        "This account has been disabled.",
+      "auth/too-many-requests":
+        "Too many attempts. Please try again later.",
+      "auth/network-request-failed":
+        "Network error. Check your internet connection.",
+    };
+
+    setError(
+      messages[error.code] || "Authentication failed. Please try again.",
     );
-    onDone(email.trim().toLowerCase());
-  };
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <section className="workspace-auth-card">
       <div className="workspace-leaf">
@@ -347,11 +389,11 @@ export default function MyWorkspace({ sites, recommendationsBySite, email, onEma
     });
 
   if (!email)
-    return (
-      <main className="workspace-page">
-        <AuthGate onDone={onEmailChange} />
-      </main>
-    );
+  return (
+    <main className="workspace-page">
+      <AuthGate />
+    </main>
+  );
   return (
     <main className="workspace-page">
       <div className="workspace-wrap">

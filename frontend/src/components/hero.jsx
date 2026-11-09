@@ -3,7 +3,7 @@ import Icon from "./Icon";
 const heroImage =
   "https://images.unsplash.com/photo-1524247108137-732e0f642303?auto=format&fit=crop&w=1800&q=88";
 
-export default function Hero() {
+export default function Hero({ onNavigate }) {
   return (
     <section className="hero" id="top">
       <img
@@ -26,10 +26,10 @@ export default function Hero() {
           places we call home.
         </p>
         <div className="hero-actions">
-          <a href="#discover" className="button button-earth">
+          <a href="/sites" className="button button-earth" onClick={(event) => onNavigate?.(event, "discover", "/sites")}>
             Explore sample sites <Icon name="arrow" />
           </a>
-          <a href="#plants" className="text-link light-link">
+          <a href="/species" className="text-link light-link" onClick={(event) => onNavigate?.(event, "plants", "/species")}>
             Browse plants <Icon name="chevron" size={17} />
           </a>
         </div>

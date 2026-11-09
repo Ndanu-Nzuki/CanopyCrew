@@ -21,6 +21,18 @@ const sectionByPath = {
   "/contact": "contact",
 };
 
+function getSiteIdFromLocation() {
+  const pathMatch = window.location.pathname.match(/^\/sites\/([^/]+)\/?$/);
+  const hashMatch = window.location.hash.match(/^#site\/(.+)$/);
+  const encodedId = pathMatch?.[1] || hashMatch?.[1];
+  if (!encodedId) return null;
+  try {
+    return decodeURIComponent(encodedId);
+  } catch {
+    return null;
+  }
+}
+
 async function getJson(path) {
   const response = await fetch(`${API_BASE_URL}${path}`);
 
@@ -88,8 +100,7 @@ useEffect(() => {
 }, []);
 
   const [activeSiteId, setActiveSiteId] = useState(() => {
-    const match = window.location.hash.match(/^#site\/(.+)$/);
-    return match ? decodeURIComponent(match[1]) : null;
+    return getSiteIdFromLocation();
   });
 
   // Resolve section, workspace, and site URLs on direct loads and browser navigation.
@@ -102,14 +113,13 @@ useEffect(() => {
       }
 
       setWorkspaceOpen(false);
-      const match = window.location.hash.match(/^#site\/(.+)$/);
-      const siteId = match ? decodeURIComponent(match[1]) : null;
+      const siteId = getSiteIdFromLocation();
       setActiveSiteId(siteId);
 
       if (siteId) {
         if (!window.history.state?.canopyCrewSite) {
           window.history.replaceState(
-            { canopyCrewSite: true, canReturn: event?.type === "hashchange" },
+            { canopyCrewSite: true, canReturn: Boolean(event) },
             "",
             window.location.href,
           );
@@ -250,6 +260,26 @@ useEffect(() => {
     );
   };
 
+  const navigateToSite = (event, siteId) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) return;
+    event.preventDefault();
+    setWorkspaceOpen(false);
+    setActiveSiteId(siteId);
+    window.history.pushState(
+      { canopyCrewSite: true, canReturn: true },
+      "",
+      `/sites/${encodeURIComponent(siteId)}`,
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const openWorkspace = () => {
     setWorkspaceOpen(true);
     setActiveSiteId(null);
@@ -279,7 +309,7 @@ useEffect(() => {
 
   return (
     <>
-      <Navbar onWorkspace={openWorkspace} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateToSection} onHome={goHome} workspaceOpen={workspaceOpen} />
+        <Navbar onWorkspace={openWorkspace} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateToSection} onHome={goHome} workspaceOpen={workspaceOpen} />
 
       {workspaceOpen ? (
   authLoading ? (
@@ -326,8 +356,8 @@ useEffect(() => {
           )
         ) : (
           <>
-            <Hero />
-            <Discover sites={sites} status={sitesStatus} onNavigate={navigateToSection} />
+            <Hero onNavigate={navigateToSection} />
+            <Discover sites={sites} status={sitesStatus} onNavigate={navigateToSection} onSiteOpen={navigateToSite} />
             <PlantCatalogue plants={plants} status={plantsStatus} />
             <About />
           </>

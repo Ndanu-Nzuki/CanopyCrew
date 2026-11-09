@@ -3,7 +3,7 @@ import Icon from "./Icon";
 export default function Logo({ onHome }) {
   return (
     <a
-      href="#top"
+      href="/"
       className="logo"
       aria-label="CanopyCrew home"
       onClick={onHome ? (event) => { event.preventDefault(); onHome(); } : undefined}

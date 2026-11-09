@@ -13,16 +13,16 @@ export default function Navbar({ onWorkspace, onSignOut, signedIn = false, onNav
           className={open ? "nav-links open" : "nav-links"}
           aria-label="Primary navigation"
         >
-          <a href="#discover" onClick={(event) => { close(); onNavigate?.(event, "discover"); }}>
+          <a href="/sites" onClick={(event) => { close(); onNavigate?.(event, "discover", "/sites"); }}>
             Discover
           </a>
-          <a href="#plants" onClick={(event) => { close(); onNavigate?.(event, "plants"); }}>
+          <a href="/species" onClick={(event) => { close(); onNavigate?.(event, "plants", "/species"); }}>
             Plant catalogue
           </a>
-          <a href="#about" onClick={(event) => { close(); onNavigate?.(event, "about"); }}>
+          <a href="/about" onClick={(event) => { close(); onNavigate?.(event, "about", "/about"); }}>
             About us
           </a>
-          <a href="#contact" onClick={(event) => { close(); onNavigate?.(event, "contact"); }}>
+          <a href="/contact" onClick={(event) => { close(); onNavigate?.(event, "contact", "/contact"); }}>
             Contact
           </a>
           <button

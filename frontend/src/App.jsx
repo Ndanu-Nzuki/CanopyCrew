@@ -14,6 +14,13 @@ const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1"
 ).replace(/\/+(?:api\/v1\/?)?$/, "");
 
+const sectionByPath = {
+  "/sites": "discover",
+  "/species": "plants",
+  "/about": "about",
+  "/contact": "contact",
+};
+
 async function getJson(path) {
   const response = await fetch(`${API_BASE_URL}${path}`);
 
@@ -63,7 +70,9 @@ export default function App() {
 
   const [sitesStatus, setSitesStatus] = useState("loading");
   const [plantsStatus, setPlantsStatus] = useState("loading");
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(
+    () => window.location.pathname === "/workspace",
+  );
   const [currentUser, setCurrentUser] = useState(null);
 const [authLoading, setAuthLoading] = useState(true);
 
@@ -83,41 +92,52 @@ useEffect(() => {
     return match ? decodeURIComponent(match[1]) : null;
   });
 
-  // Keep the active site synchronized with the URL.
+  // Resolve section, workspace, and site URLs on direct loads and browser navigation.
   useEffect(() => {
-    const syncSiteFromUrl = () => {
+    const syncLocation = (event) => {
+      if (window.location.pathname === "/workspace") {
+        setWorkspaceOpen(true);
+        setActiveSiteId(null);
+        return;
+      }
+
+      setWorkspaceOpen(false);
       const match = window.location.hash.match(/^#site\/(.+)$/);
       const siteId = match ? decodeURIComponent(match[1]) : null;
-
       setActiveSiteId(siteId);
 
       if (siteId) {
-        window.history.replaceState(
-          { canopyCrewSite: true, canReturn: true },
-          "",
-          window.location.href,
-        );
+        if (!window.history.state?.canopyCrewSite) {
+          window.history.replaceState(
+            { canopyCrewSite: true, canReturn: event?.type === "hashchange" },
+            "",
+            window.location.href,
+          );
+        }
+        window.scrollTo({ top: 0 });
+        return;
+      }
 
+      const sectionId = sectionByPath[window.location.pathname];
+      if (sectionId) {
+        window.setTimeout(
+          () => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }),
+          0,
+        );
+      } else if (window.location.pathname === "/") {
         window.scrollTo({ top: 0 });
       }
     };
 
-    if (activeSiteId && !window.history.state?.canopyCrewSite) {
-      window.history.replaceState(
-        { canopyCrewSite: true, canReturn: false },
-        "",
-        window.location.href,
-      );
-    }
-
-    window.addEventListener("hashchange", syncSiteFromUrl);
-    window.addEventListener("popstate", syncSiteFromUrl);
+    syncLocation();
+    window.addEventListener("hashchange", syncLocation);
+    window.addEventListener("popstate", syncLocation);
 
     return () => {
-      window.removeEventListener("hashchange", syncSiteFromUrl);
-      window.removeEventListener("popstate", syncSiteFromUrl);
+      window.removeEventListener("hashchange", syncLocation);
+      window.removeEventListener("popstate", syncLocation);
     };
-  }, [activeSiteId]);
+  }, []);
 
   // Load the full catalogue separately from site-specific recommendations.
   useEffect(() => {
@@ -210,36 +230,44 @@ useEffect(() => {
       return;
     }
 
-    window.history.replaceState(
-      { canopyCrewHome: true },
-      "",
-      "#discover",
-    );
+    window.history.replaceState({ canopyCrewHome: true }, "", "/sites");
 
     setActiveSiteId(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(
+      () => document.getElementById("discover")?.scrollIntoView({ behavior: "smooth" }),
+      0,
+    );
   };
 
-  const navigateFromWorkspace = (event, sectionId) => {
-    if (!workspaceOpen && !activeSiteId) return;
+  const navigateToSection = (event, sectionId, path) => {
     event.preventDefault();
     setWorkspaceOpen(false);
     setActiveSiteId(null);
-    window.history.replaceState({ canopyCrewHome: true }, "", `#${sectionId}`);
-    window.setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }), 0);
+    window.history.pushState({ canopyCrewHome: true }, "", path);
+    window.setTimeout(
+      () => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }),
+      0,
+    );
+  };
+
+  const openWorkspace = () => {
+    setWorkspaceOpen(true);
+    setActiveSiteId(null);
+    if (window.location.pathname !== "/workspace") {
+      window.history.pushState({ canopyCrewWorkspace: true }, "", "/workspace");
+    }
   };
 
   const goHome = () => {
     setWorkspaceOpen(false);
     setActiveSiteId(null);
-    window.history.replaceState({ canopyCrewHome: true }, "", "#top");
+    window.history.pushState({ canopyCrewHome: true }, "", "/");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const signOutWorkspace = async () => {
   try {
     await signOut(auth);
-    setWorkspaceOpen(false);
   } catch (error) {
     console.error("Unable to sign out:", error);
   }
@@ -251,7 +279,7 @@ useEffect(() => {
 
   return (
     <>
-      <Navbar onWorkspace={() => setWorkspaceOpen(true)} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateFromWorkspace} onHome={goHome} workspaceOpen={workspaceOpen} />
+      <Navbar onWorkspace={openWorkspace} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateToSection} onHome={goHome} workspaceOpen={workspaceOpen} />
 
       {workspaceOpen ? (
   authLoading ? (
@@ -299,14 +327,14 @@ useEffect(() => {
         ) : (
           <>
             <Hero />
-            <Discover sites={sites} status={sitesStatus} />
+            <Discover sites={sites} status={sitesStatus} onNavigate={navigateToSection} />
             <PlantCatalogue plants={plants} status={plantsStatus} />
             <About />
           </>
         )}
       </main>
 
-      {!activeSiteId && <Footer onHome={goHome} onWorkspace={() => setWorkspaceOpen(true)} />}
+      {!activeSiteId && <Footer onHome={goHome} onWorkspace={openWorkspace} onNavigate={navigateToSection} />}
       </>)
       }
     </>

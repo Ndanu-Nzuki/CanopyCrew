@@ -65,7 +65,7 @@ function SiteCard({ site, index }) {
   );
 }
 
-export default function Discover({ sites, status }) {
+export default function Discover({ sites, status, onNavigate }) {
   return (
     <section className="section discover" id="discover">
       <div className="page-shell">
@@ -80,7 +80,7 @@ export default function Discover({ sites, status }) {
           }
           copy="Explore the São Paulo site types CanopyCrew helps communities transform, grounded in local growing conditions."
           action={
-            <a className="text-link" href="#contact">
+            <a className="text-link" href="/contact" onClick={(event) => onNavigate?.(event, "contact", "/contact")}>
               Get involved <Icon name="arrow" size={18} />
             </a>
           }

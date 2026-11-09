@@ -2,7 +2,7 @@ import { useState } from "react";
 import Icon from "./Icon";
 import Logo from "./Logo";
 
-export default function Footer({ onHome, onWorkspace }) {
+export default function Footer({ onHome, onWorkspace, onNavigate }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const submit = (event) => {
@@ -64,14 +64,13 @@ export default function Footer({ onHome, onWorkspace }) {
           </div>
           <div className="footer-links">
             <strong>Explore</strong>
-            <a href="#discover">Nearby sites</a>
-            <a href="#plants">Plant catalogue</a>
-            <a href="#about">Our story</a>
+            <a href="/sites" onClick={(event) => onNavigate?.(event, "discover", "/sites")}>Nearby sites</a>
+            <a href="/species" onClick={(event) => onNavigate?.(event, "plants", "/species")}>Plant catalogue</a>
+            <a href="/about" onClick={(event) => onNavigate?.(event, "about", "/about")}>Our story</a>
           </div>
           <div className="footer-links">
             <strong>Get involved</strong>
-            {/* <a href="#discover">Join a crew</a> */}
-            <a href="#workspace" onClick={(event) => { event.preventDefault(); onWorkspace?.(); }}>Start a project</a>
+            <a href="/workspace" onClick={(event) => { event.preventDefault(); onWorkspace?.(); }}>Start a project</a>
             <a href="mailto:hello@canopycrew.org">Partner with us</a>
           </div>
           <div className="footer-links contact-links">

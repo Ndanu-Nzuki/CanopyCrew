@@ -2,11 +2,11 @@ import { useState } from "react";
 import Icon from "./Icon";
 import Logo from "./Logo";
 
-export default function Navbar() {
+export default function Navbar({ onWorkspace, workspaceOpen = false }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return (
-    <header className="navbar">
+    <header className={workspaceOpen ? "navbar workspace-navbar" : "navbar"}>
       <div className="nav-inner">
         <Logo />
         <nav
@@ -25,17 +25,16 @@ export default function Navbar() {
           <a href="#contact" onClick={close}>
             Contact
           </a>
-          <a
+          <button
             className="button button-small mobile-cta"
-            href="#discover"
-            onClick={close}
+            onClick={() => { close(); onWorkspace(); }}
           >
             MyWorkspace <Icon name="arrow" size={17} />
-          </a>
+          </button>
         </nav>
-        <a className="button button-small desktop-cta" href="#discover">
+        <button className="button button-small desktop-cta" onClick={onWorkspace}>
           MyWorkspace <Icon name="arrow" size={17} />
-        </a>
+        </button>
         <button
           className="menu-button"
           onClick={() => setOpen(!open)}

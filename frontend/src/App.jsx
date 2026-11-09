@@ -6,6 +6,7 @@ import Hero from "./components/hero";
 import Navbar from "./components/navbar";
 import PlantCatalogue from "./components/plantcatalogue";
 import SiteDetail from "./components/sitedetail";
+import MyWorkspace from "./components/MyWorkspace";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1"
@@ -60,6 +61,7 @@ export default function App() {
 
   const [sitesStatus, setSitesStatus] = useState("loading");
   const [plantsStatus, setPlantsStatus] = useState("loading");
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   const [activeSiteId, setActiveSiteId] = useState(() => {
     const match = window.location.hash.match(/^#site\/(.+)$/);
@@ -209,7 +211,13 @@ export default function App() {
 
   return (
     <>
-      <Navbar />
+      <Navbar onWorkspace={() => setWorkspaceOpen(true)} workspaceOpen={workspaceOpen} />
+
+      {workspaceOpen ? <MyWorkspace
+        sites={sites}
+        recommendationsBySite={recommendationsBySite}
+        onClose={() => setWorkspaceOpen(false)}
+      /> : <>
 
       <main>
         {activeSiteId ? (
@@ -250,6 +258,7 @@ export default function App() {
       </main>
 
       {!activeSiteId && <Footer />}
+      </>}
     </>
   );
 }

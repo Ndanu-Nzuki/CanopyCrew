@@ -62,6 +62,13 @@ export default function App() {
   const [sitesStatus, setSitesStatus] = useState("loading");
   const [plantsStatus, setPlantsStatus] = useState("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceEmail, setWorkspaceEmail] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("canopycrew.demo.account"))?.email || "";
+    } catch {
+      return "";
+    }
+  });
 
   const [activeSiteId, setActiveSiteId] = useState(() => {
     const match = window.location.hash.match(/^#site\/(.+)$/);
@@ -205,18 +212,40 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const navigateFromWorkspace = (event, sectionId) => {
+    if (!workspaceOpen && !activeSiteId) return;
+    event.preventDefault();
+    setWorkspaceOpen(false);
+    setActiveSiteId(null);
+    window.history.replaceState({ canopyCrewHome: true }, "", `#${sectionId}`);
+    window.setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }), 0);
+  };
+
+  const goHome = () => {
+    setWorkspaceOpen(false);
+    setActiveSiteId(null);
+    window.history.replaceState({ canopyCrewHome: true }, "", "#top");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const signOutWorkspace = () => {
+    localStorage.removeItem("canopycrew.demo.account");
+    setWorkspaceEmail("");
+  };
+
   const activeSite = sites.find(
     (site) => site.site_id === activeSiteId,
   );
 
   return (
     <>
-      <Navbar onWorkspace={() => setWorkspaceOpen(true)} workspaceOpen={workspaceOpen} />
+      <Navbar onWorkspace={() => setWorkspaceOpen(true)} onSignOut={signOutWorkspace} signedIn={Boolean(workspaceEmail)} onNavigate={navigateFromWorkspace} onHome={goHome} workspaceOpen={workspaceOpen} />
 
       {workspaceOpen ? <MyWorkspace
         sites={sites}
         recommendationsBySite={recommendationsBySite}
-        onClose={() => setWorkspaceOpen(false)}
+        email={workspaceEmail}
+        onEmailChange={setWorkspaceEmail}
       /> : <>
 
       <main>
@@ -257,7 +286,7 @@ export default function App() {
         )}
       </main>
 
-      {!activeSiteId && <Footer />}
+      {!activeSiteId && <Footer onHome={goHome} onWorkspace={() => setWorkspaceOpen(true)} />}
       </>}
     </>
   );

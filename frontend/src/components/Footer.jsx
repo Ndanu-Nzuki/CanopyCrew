@@ -2,7 +2,7 @@ import { useState } from "react";
 import Icon from "./Icon";
 import Logo from "./Logo";
 
-export default function Footer() {
+export default function Footer({ onHome, onWorkspace }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const submit = (event) => {
@@ -56,7 +56,7 @@ export default function Footer() {
         </div>
         <div className="footer-main">
           <div className="footer-brand">
-            <Logo />
+            <Logo onHome={onHome} />
             <p>
               Helping people and nature thrive together, one city patch at a
               time.
@@ -70,8 +70,8 @@ export default function Footer() {
           </div>
           <div className="footer-links">
             <strong>Get involved</strong>
-            <a href="#discover">Join a crew</a>
-            <a href="mailto:hello@canopycrew.org">Start a project</a>
+            {/* <a href="#discover">Join a crew</a> */}
+            <a href="#workspace" onClick={(event) => { event.preventDefault(); onWorkspace?.(); }}>Start a project</a>
             <a href="mailto:hello@canopycrew.org">Partner with us</a>
           </div>
           <div className="footer-links contact-links">

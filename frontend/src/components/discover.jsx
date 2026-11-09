@@ -19,14 +19,15 @@ function SectionHeading({ eyebrow, title, copy, action }) {
   );
 }
 
-function SiteCard({ site, index }) {
+function SiteCard({ site, index, onSiteOpen }) {
   const image = getSiteImage(site, index);
   const light = site.sunlight_exposure.replaceAll("_", " ");
 
   return (
     <a
       className="site-card"
-      href={`#site/${encodeURIComponent(site.site_id)}`}
+      href={`/sites/${encodeURIComponent(site.site_id)}`}
+      onClick={(event) => onSiteOpen?.(event, site.site_id)}
     >
       <div className="site-image-wrap">
         <img
@@ -65,7 +66,7 @@ function SiteCard({ site, index }) {
   );
 }
 
-export default function Discover({ sites, status, onNavigate }) {
+export default function Discover({ sites, status, onNavigate, onSiteOpen }) {
   return (
     <section className="section discover" id="discover">
       <div className="page-shell">
@@ -100,6 +101,7 @@ export default function Discover({ sites, status, onNavigate }) {
                 key={site.site_id}
                 site={site}
                 index={index}
+                onSiteOpen={onSiteOpen}
               />
             ))}
           </div>

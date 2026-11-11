@@ -160,3 +160,148 @@ grep -n "^USER appuser" backend/Dockerfile
 cd backend
 pytest -v
 ```
+---
+
+## 7. Security Review Record (2026-11-10)
+
+| Field | Value |
+| :--- | :--- |
+| **Review type** | AI-assisted review (Claude, Anthropic) of this document plus black-box tests run by the team in Cloud Shell |
+| **Scope** | Live Cloud Run service `canopycrew-api` (revision `canopycrew-api-00003-gth`, `us-central1`) and Firebase frontend `canopycrew-sp-mvp.web.app` |
+| **Status** | **CONDITIONAL. Not approved for sign-off** until the required remediations in 7.3 are complete and re-tested |
+| **Not a formal audit** | The reviewer cannot act as an approving authority. Approval below is reserved for the document owners |
+
+### 7.1 Verified controls (evidence from live tests)
+
+| Control | Evidence | Result |
+| :--- | :--- | :--- |
+| API reachable over HTTPS | `GET /` and `GET /health` return `200` | Verified |
+| Dockerfile-based build | Cloud Build step image is `gcr.io/cloud-builders/docker` | Verified |
+| Non-root runtime | `docker run --entrypoint id <live image digest>` returns `uid=999(appuser)` | Verified |
+| Strict input schema | Extra field `is_admin` returns `422` | Verified |
+| CORS allows production frontend | `Origin: https://canopycrew-sp-mvp.web.app` is allowed | Verified |
+| CORS blocks unrelated origins | `https://evil.example.com` receives no allow-origin header | Verified |
+| Methods restricted | Preflight returns `GET, POST, OPTIONS` only | Verified |
+| Catalog allow-list enforced | Unknown species ID returns `400` | Verified |
+
+### 7.2 Findings
+
+| ID | Severity | Finding | Status |
+| :--- | :--- | :--- | :--- |
+| F-1 | Medium | The CORS regex `^https://...\.run\.app$` allows any Cloud Run origin (`https://evil-test.run.app` received `access-control-allow-origin`). Impact is limited because `allow_credentials=False`, but it contradicts Section 4.2 | **Open** |
+| F-2 | Medium | The public API has no authentication, rate limit, or daily cap on NIM calls. Each request may consume NVIDIA credits. `--max-instances 2` limits instances, not request volume | **Open** |
+| F-3 | Medium | No upper bounds on string length or list size. A 1 MB `site_id` was accepted and parsed (response was a `404` lookup failure, not `422`) | **Open** |
+| F-4 | Low | `/docs`, `/redoc`, and `/openapi.json` return `200` (full API schema is public) | **Open: hide, or accept and document** |
+| F-5 | Low | No security response headers (HSTS, `X-Content-Type-Options`, `Cache-Control`, `Referrer-Policy`) | **Open** |
+| F-6 | Medium | Overhead-wire safety (`<= 5.0 m`) is **unverified**. The only test submitted `cecropia-hololeuca`, which returned `400` because the species is not in the catalog, not because of the height rule | **Open: test with a real tall species ID and a short control** |
+| F-7 | Info | Documentation inaccuracies (see 7.4) | **Open** |
+
+### 7.3 Required before sign-off
+
+1. Replace the `.run.app` CORS regex with an explicit origin list (`web.app`, `firebaseapp.com`, localhost). Re-test the hostile-origin case.
+2. Add `max_length`, an ID pattern, and a list-size cap to all request fields. Re-test with a 1 MB payload (expect `422`).
+3. Add a daily cap on NIM calls and a billing budget alert. Add App Check or authentication if volunteer accounts exist.
+4. Run the wire-safety test with real catalog IDs: tall species must return `400` with a wire-safety message, short species `200`.
+5. Decide on API docs exposure (disable in production, or record the decision here).
+6. Add security headers middleware.
+
+### 7.4 Corrections needed in this document
+
+- **Section 2.2:** Builds use the user-managed account `canopycrew-build` via `--build-service-account`, not the default Cloud Build Service Agent. List its exact roles (e.g., `run.admin`, `artifactregistry.writer`, `logging.logWriter`, and `iam.serviceAccountUser` on `canopycrew-runtime`) and the reason for each.
+- **Section 4.2:** Replace the CORS regex description after fixing F-1.
+- **Section 5:** Replace `cecropia-hololeuca` as the wire-safety example unless it is confirmed to exist in the catalog.
+- **Header table, `$0 Always Free Tier`:** Reword to "designed to stay within free-tier limits, with budget alerts". Artifact Registry storage, Cloud Build minutes, and egress can incur charges.
+- **Section 3:** Note that `:latest` secrets are read at instance start, so key rotation requires a new revision.
+
+### 7.5 Not verified by this review
+
+The reviewer had no evidence for the following, and they should be checked by the owners:
+
+- Actual IAM bindings (project-level roles on both service accounts, absence of Editor on the default Compute account)
+- Secret-scoped `secretAccessor` binding and secret version history
+- Absence of user-managed service account keys
+- Git history scanning for leaked keys (only a current-tree `grep` is documented)
+- Firestore security rules (if Firestore is used)
+- Dependency and image vulnerability scan results
+- Audit log configuration
+
+### 7.6 Approval
+
+| Role | Name | Decision | Date |
+| :--- | :--- | :--- | :--- |
+| Cloud Cybersecurity Lane | Idris | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
+| Cloud Engineering Lane | Alice | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
+
+**Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.---
+
+## 7. Security Review Record (2026-11-10)
+
+| Field | Value |
+| :--- | :--- |
+| **Review type** | AI-assisted review (Claude, Anthropic) of this document plus black-box tests run by the team in Cloud Shell |
+| **Scope** | Live Cloud Run service `canopycrew-api` (revision `canopycrew-api-00003-gth`, `us-central1`) and Firebase frontend `canopycrew-sp-mvp.web.app` |
+| **Status** | **CONDITIONAL. Not approved for sign-off** until the required remediations in 7.3 are complete and re-tested |
+| **Not a formal audit** | The reviewer cannot act as an approving authority. Approval below is reserved for the document owners |
+
+### 7.1 Verified controls (evidence from live tests)
+
+| Control | Evidence | Result |
+| :--- | :--- | :--- |
+| API reachable over HTTPS | `GET /` and `GET /health` return `200` | Verified |
+| Dockerfile-based build | Cloud Build step image is `gcr.io/cloud-builders/docker` | Verified |
+| Non-root runtime | `docker run --entrypoint id <live image digest>` returns `uid=999(appuser)` | Verified |
+| Strict input schema | Extra field `is_admin` returns `422` | Verified |
+| CORS allows production frontend | `Origin: https://canopycrew-sp-mvp.web.app` is allowed | Verified |
+| CORS blocks unrelated origins | `https://evil.example.com` receives no allow-origin header | Verified |
+| Methods restricted | Preflight returns `GET, POST, OPTIONS` only | Verified |
+| Catalog allow-list enforced | Unknown species ID returns `400` | Verified |
+
+### 7.2 Findings
+
+| ID | Severity | Finding | Status |
+| :--- | :--- | :--- | :--- |
+| F-1 | Medium | The CORS regex `^https://...\.run\.app$` allows any Cloud Run origin (`https://evil-test.run.app` received `access-control-allow-origin`). Impact is limited because `allow_credentials=False`, but it contradicts Section 4.2 | **Open** |
+| F-2 | Medium | The public API has no authentication, rate limit, or daily cap on NIM calls. Each request may consume NVIDIA credits. `--max-instances 2` limits instances, not request volume | **Open** |
+| F-3 | Medium | No upper bounds on string length or list size. A 1 MB `site_id` was accepted and parsed (response was a `404` lookup failure, not `422`) | **Open** |
+| F-4 | Low | `/docs`, `/redoc`, and `/openapi.json` return `200` (full API schema is public) | **Open: hide, or accept and document** |
+| F-5 | Low | No security response headers (HSTS, `X-Content-Type-Options`, `Cache-Control`, `Referrer-Policy`) | **Open** |
+| F-6 | Medium | Overhead-wire safety (`<= 5.0 m`) is **unverified**. The only test submitted `cecropia-hololeuca`, which returned `400` because the species is not in the catalog, not because of the height rule | **Open: test with a real tall species ID and a short control** |
+| F-7 | Info | Documentation inaccuracies (see 7.4) | **Open** |
+
+### 7.3 Required before sign-off
+
+1. Replace the `.run.app` CORS regex with an explicit origin list (`web.app`, `firebaseapp.com`, localhost). Re-test the hostile-origin case.
+2. Add `max_length`, an ID pattern, and a list-size cap to all request fields. Re-test with a 1 MB payload (expect `422`).
+3. Add a daily cap on NIM calls and a billing budget alert. Add App Check or authentication if volunteer accounts exist.
+4. Run the wire-safety test with real catalog IDs: tall species must return `400` with a wire-safety message, short species `200`.
+5. Decide on API docs exposure (disable in production, or record the decision here).
+6. Add security headers middleware.
+
+### 7.4 Corrections needed in this document
+
+- **Section 2.2:** Builds use the user-managed account `canopycrew-build` via `--build-service-account`, not the default Cloud Build Service Agent. List its exact roles (e.g., `run.admin`, `artifactregistry.writer`, `logging.logWriter`, and `iam.serviceAccountUser` on `canopycrew-runtime`) and the reason for each.
+- **Section 4.2:** Replace the CORS regex description after fixing F-1.
+- **Section 5:** Replace `cecropia-hololeuca` as the wire-safety example unless it is confirmed to exist in the catalog.
+- **Header table, `$0 Always Free Tier`:** Reword to "designed to stay within free-tier limits, with budget alerts". Artifact Registry storage, Cloud Build minutes, and egress can incur charges.
+- **Section 3:** Note that `:latest` secrets are read at instance start, so key rotation requires a new revision.
+
+### 7.5 Not verified by this review
+
+The reviewer had no evidence for the following, and they should be checked by the owners:
+
+- Actual IAM bindings (project-level roles on both service accounts, absence of Editor on the default Compute account)
+- Secret-scoped `secretAccessor` binding and secret version history
+- Absence of user-managed service account keys
+- Git history scanning for leaked keys (only a current-tree `grep` is documented)
+- Firestore security rules (if Firestore is used)
+- Dependency and image vulnerability scan results
+- Audit log configuration
+
+### 7.6 Approval
+
+| Role | Name | Decision | Date |
+| :--- | :--- | :--- | :--- |
+| Cloud Cybersecurity Lane | Idris | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
+| Cloud Engineering Lane | Alice | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
+
+**Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.

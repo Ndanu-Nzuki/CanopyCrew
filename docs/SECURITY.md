@@ -6,7 +6,7 @@
 | **UN SDG Alignment** | **UN SDG 11** (Sustainable Cities and Communities — **Target 11.7**: Universal access to safe, inclusive, green public spaces) |
 | **Municipal & Legal Standards** | *Portaria SVMA nº 26/2024*, *BioSampa (5ª Edição)*, and *Plano Municipal de Arborização Urbana (PMAU)* |
 | **Cloud & AI Stack** | Python `3.12.7` / FastAPI, **Google Cloud** (`canopycrew-sp-mvp`: Cloud Run, Secret Manager, Firestore), **NVIDIA NIM API** |
-| **Financial & Security Posture** | **Zero Hardcoded Secrets**, **Least-Privilege IAM**, **Non-Root Container Runtime**, **`$0` Always Free Tier** |
+| **Financial & Security Posture** | **Zero Hardcoded Secrets**, **Least-Privilege IAM**, **Non-Root Container Runtime**, **Designed to stay within Free-Tier limits with budget alerts** |
 
 > **GitHub Web Editor Tip:** Any teammate can view or edit this document directly in the browser without terminal commands by pressing `.` on the CanopyCrew GitHub repository page.
 
@@ -39,7 +39,7 @@ CanopyCrew strictly separates **build-time** and **runtime** principals:
 | Principal / Identity | Scope | Granted IAM Roles | Explicitly Denied / Excluded Capabilities |
 | :--- | :--- | :--- | :--- |
 | **Cloud Run Runtime Identity**<br/>`canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` | Attached to `canopycrew-api` Cloud Run revision via `--service-account` | • `roles/secretmanager.secretAccessor` (scoped solely to `canopycrew-nvidia-api-key`)<br/>• `roles/datastore.user` (optional, for `<= 1 GiB` Firestore community plans) | **No** `cloudbuild.builds.builder`, **no** `artifactregistry.writer`, **no** `storage.admin`, and **no** project-wide `Editor` or `Owner` roles. |
-| **Cloud Build Service Agent**<br/>Managed Google Cloud Build identity | Executes only during `gcloud run deploy --source ./backend` | • `roles/artifactregistry.writer`<br/>• `roles/logging.logWriter` | Never attached to the public-facing Cloud Run container at runtime. |
+| **Dedicated Build Identity**<br/>`canopycrew-build@canopycrew-sp-mvp.iam.gserviceaccount.com` | Executes only during `gcloud run deploy --source ./backend --build-service-account` | • `roles/artifactregistry.writer` (push container layers)<br/>• `roles/logging.logWriter` (stream build logs)<br/>• `roles/run.admin` (deploy Cloud Run revisions)<br/>• `roles/iam.serviceAccountUser` (scoped to `canopycrew-runtime` to attach runtime SA) | Never attached to the public-facing Cloud Run container at runtime. |
 
 ```mermaid
 flowchart TB
@@ -100,27 +100,29 @@ CanopyCrew enforces a **Zero Hardcoded Secrets** policy across all four lanes:
 2. **In-Memory Masking via Pydantic `SecretStr` (`backend/app/core/config.py`):**
    - `Settings.nvidia_api_key` is typed as `SecretStr | None = Field(default=None, validation_alias="NVIDIA_API_KEY")`.
    - If a configuration object is logged or serialized in an exception traceback, Pydantic outputs `SecretStr('**********')` instead of leaking the raw API key.
-   - The helper method `Settings.has_nvidia_api_key` safely checks whether a non-empty key is configured without exposing the secret string to caller modules.
+   - The helper properties `Settings.has_nvidia_api_key` and `NIMClient.is_configured` safely check whether a non-empty key is configured without exposing the secret string to caller modules.
 3. **Google Secret Manager Runtime Injection:**
-   - In production on Cloud Run, `NVIDIA_API_KEY` is mounted as an environment variable directly from Google Secret Manager (`--set-secrets="NVIDIA_API_KEY=canopycrew-nvidia-api-key:latest"`) at container startup.
+   - In production on Cloud Run, `NVIDIA_API_KEY` is mounted as an environment variable directly from Google Secret Manager (`--set-secrets="NVIDIA_API_KEY=canopycrew-nvidia-api-key:latest"`) at container startup. Note that `:latest` secrets mounted as environment variables are resolved at instance startup, so rotating the key requires deploying a new Cloud Run revision.
    - In local development or CI test runs (`pytest -v`), `NVIDIA_API_KEY` is omitted and the application operates deterministically without external network calls.
 
 ---
 
 ## 4. Application, API & Container Hardening
 
-### 4.1 Strict Pydantic v2 Input Sanitization (`extra="forbid"`)
+### 4.1 Strict Pydantic v2 Input Sanitization (`extra="forbid"` & Length/Pattern Bounds)
 Every request and response model in [`backend/app/schemas/plan.py`](../backend/app/schemas/plan.py) enforces `model_config = ConfigDict(extra="forbid")`:
 - **Mass-Assignment & Payload Pollution Prevention:** Any unexpected JSON property sent to `POST /api/v1/volunteer-plan` is rejected immediately at the FastAPI boundary with `HTTP 422 Unprocessable Entity`.
-- **Type & Bounds Validation:**
-  - `site_id` and `selected_species_ids` require non-empty strings (`Field(min_length=1)`), and `selected_species_ids` must contain at least one element.
+- **Type, Pattern & Bounds Validation:**
+  - `site_id` and `selected_species_ids` enforce strict length and slug pattern bounds (`min_length=1`, `max_length=64`, `pattern=r"^[a-z0-9-]+$"`), `selected_species_ids` is bounded to `max_length=10` items, and optional `volunteer_name` is bounded to `max_length=100` characters. Path/query parameters on `GET /api/v1/sites/{site_id}`, `GET /api/v1/species/{species_id}`, and `GET /api/v1/recommendations` enforce the same `max_length=64` and `^[a-z0-9-]+$` pattern.
   - Startup catalog loaders (`load_sites()` and `load_species()` in `backend/app/services/recommender.py`) validate `backend/data/sites.json` and `backend/data/species.json` against strict `Literal` enums and numeric bounds (`gt=0`) before serving traffic.
 
-### 4.2 CORS Lockdown (`backend/app/main.py` & `backend/app/core/config.py`)
-Cross-Origin Resource Sharing is restricted to prevent unauthorized third-party sites from abusing the API:
-- **Explicit Allowed Origins:** `http://localhost:5173` and `http://127.0.0.1:5173` (local Vite dev server).
-- **Production Origin Regex:** `^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$` (permits only HTTPS Google Cloud Run deployments).
+### 4.2 CORS Lockdown, Production Docs Toggle & Security Headers (`backend/app/main.py` & `backend/app/core/config.py`)
+Cross-Origin Resource Sharing and HTTP response headers are restricted to prevent unauthorized third-party sites from abusing the API:
+- **Explicit Allowed Origins:** `http://localhost:5173`, `http://127.0.0.1:5173`, `https://canopycrew-sp-mvp.web.app`, and `https://canopycrew-sp-mvp.firebaseapp.com`.
+- **Service-Scoped Cloud Run Regex:** `^https://canopycrew-[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$` (restricts `.run.app` origins strictly to `canopycrew-*` services and rejects unrelated third-party Cloud Run hosts such as `https://evil-test.run.app`).
 - **Restricted HTTP Verbs & Credentials:** `allow_methods=["GET", "POST", "OPTIONS"]` (blocks `PUT`, `PATCH`, `DELETE`) and `allow_credentials=False` (no cookies or ambient browser credentials accepted).
+- **Defensive OWASP Response Headers:** Middleware injects `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Cache-Control: no-store`.
+- **Production OpenAPI Toggle:** `/docs`, `/redoc`, and `/openapi.json` are automatically disabled (`None`) when `APP_ENV` / `ENVIRONMENT == "production"`.
 
 ### 4.3 Non-Root Container Execution (`backend/Dockerfile`)
 The production container image (`backend/Dockerfile`) follows container security best practices:
@@ -138,9 +140,9 @@ CanopyCrew prevents LLM hallucinations from causing municipal non-compliance or 
 | Decision / Calculation | Executing Layer | Security & Compliance Guarantee |
 | :--- | :--- | :--- |
 | **Exotic / Invasive Species Ban** | Static Catalog + `pytest` (`backend/data/species.json`) | Permanently excludes *Ficus microcarpa*, *Ligustrum lucidum*, and *Eucalyptus* per *Portaria SVMA nº 26/2024* and *BioSampa (5ª Edição)*. Verified on every test run by `test_species_catalog_excludes_exotic_invasive_genera`. |
-| **Overhead Power-Line Safety (`<= 5.0 m`)** | Deterministic Python (`_satisfies_wire_safety()` in `recommender.py`) | Whenever `site.constraints.overhead_power_lines == True` (`site-a-sidewalk-strip`), deterministic Python requires both `sidewalk_wire_safe == True` and `mature_height_meters <= 5.0`. Attempts to submit tall trees (`cecropia-hololeuca`, `handroanthus-chrysotrichus`, etc.) to `POST /api/v1/volunteer-plan` are rejected with `HTTP 400 Bad Request`. |
+| **Overhead Power-Line Safety (`<= 5.0 m`)** | Deterministic Python (`_satisfies_wire_safety()` in `recommender.py`) | Whenever `site.constraints.overhead_power_lines == True` (`site-a-sidewalk-strip`), deterministic Python requires both `sidewalk_wire_safe == True` and `mature_height_meters <= 5.0`. Attempts to submit tall catalog trees (`cecropia-pachystachya` at `10.0 m`, `handroanthus-chrysotrichus`, etc.) to `POST /api/v1/volunteer-plan` are rejected with `HTTP 400 Bad Request`. |
 | **Seedling Cost & Year-3 Canopy Math** | Deterministic Python (`calculate_volunteer_plan()` in `recommender.py`) | Sums `unit_cost_usd` and `canopy_coverage_m2_at_year_3` in pure Python. LLMs never calculate financial or area figures. |
-| **Volunteer Care Narrative Synthesis** | NVIDIA NIM Adapter (`backend/app/agent/`) | Receives only already-validated species and deterministic totals to generate accessible community stewardship tips; degrades gracefully to structured deterministic tasks if `NVIDIA_API_KEY` is absent or unreachable. |
+| **Volunteer Care Narrative Synthesis** | NVIDIA NIM Adapter (`backend/app/agent/`) | Receives only already-validated species and deterministic totals to generate accessible community stewardship tips; enforces a daily call cap (`nim_daily_call_cap = 100`) and degrades gracefully to structured deterministic tasks if `NVIDIA_API_KEY` is absent, capped, or unreachable. |
 
 ---
 
@@ -188,13 +190,13 @@ pytest -v
 
 | ID | Severity | Finding | Status |
 | :--- | :--- | :--- | :--- |
-| F-1 | Medium | The CORS regex `^https://...\.run\.app$` allows any Cloud Run origin (`https://evil-test.run.app` received `access-control-allow-origin`). Impact is limited because `allow_credentials=False`, but it contradicts Section 4.2 | **Open** |
-| F-2 | Medium | The public API has no authentication, rate limit, or daily cap on NIM calls. Each request may consume NVIDIA credits. `--max-instances 2` limits instances, not request volume | **Open** |
-| F-3 | Medium | No upper bounds on string length or list size. A 1 MB `site_id` was accepted and parsed (response was a `404` lookup failure, not `422`) | **Open** |
-| F-4 | Low | `/docs`, `/redoc`, and `/openapi.json` return `200` (full API schema is public) | **Open: hide, or accept and document** |
-| F-5 | Low | No security response headers (HSTS, `X-Content-Type-Options`, `Cache-Control`, `Referrer-Policy`) | **Open** |
-| F-6 | Medium | Overhead-wire safety (`<= 5.0 m`) is **unverified**. The only test submitted `cecropia-hololeuca`, which returned `400` because the species is not in the catalog, not because of the height rule | **Open: test with a real tall species ID and a short control** |
-| F-7 | Info | Documentation inaccuracies (see 7.4) | **Open** |
+| F-1 | Medium | The CORS regex `^https://...\.run\.app$` allows any Cloud Run origin (`https://evil-test.run.app` received `access-control-allow-origin`). Impact is limited because `allow_credentials=False`, but it contradicts Section 4.2 | **Resolved (`fix/backend-security-hardening`)** — Scoped regex to `^https://canopycrew-[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$` and added explicit Firebase Hosting origins; `https://evil-test.run.app` is now rejected |
+| F-2 | Medium | The public API has no authentication, rate limit, or daily cap on NIM calls. Each request may consume NVIDIA credits. `--max-instances 2` limits instances, not request volume | **Resolved (`fix/backend-security-hardening`)** — Added `nim_daily_call_cap` (default `100`/day) in `NIMClient` with automatic degradation to deterministic fallback |
+| F-3 | Medium | No upper bounds on string length or list size. A 1 MB `site_id` was accepted and parsed (response was a `404` lookup failure, not `422`) | **Resolved (`fix/backend-security-hardening`)** — Added `max_length=64` and `^[a-z0-9-]+$` pattern on `site_id` / `species_id`, `max_length=10` on `selected_species_ids`, and `max_length=100` on `volunteer_name` (returns `422`) |
+| F-4 | Low | `/docs`, `/redoc`, and `/openapi.json` return `200` (full API schema is public) | **Resolved (`fix/backend-security-hardening`)** — Conditionally disabled `/docs`, `/redoc`, and `/openapi.json` when `APP_ENV` / `ENVIRONMENT == "production"` |
+| F-5 | Low | No security response headers (HSTS, `X-Content-Type-Options`, `Cache-Control`, `Referrer-Policy`) | **Resolved (`fix/backend-security-hardening`)** — Middleware injects `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `X-XSS-Protection`, `Referrer-Policy`, and `Cache-Control: no-store` |
+| F-6 | Medium | Overhead-wire safety (`<= 5.0 m`) is **unverified**. The only test submitted `cecropia-hololeuca`, which returned `400` because the species is not in the catalog, not because of the height rule | **Resolved (`fix/backend-security-hardening`)** — Verified against real tall catalog species `cecropia-pachystachya` (`10.0 m`, returns `400` wire-safety error) and short control `eugenia-uniflora` (`200`) |
+| F-7 | Info | Documentation inaccuracies (see 7.4) | **Resolved (`fix/backend-security-hardening`)** — Updated Sections 2.2, 3, 4.2, 5, and header table |
 
 ### 7.3 Required before sign-off
 
@@ -230,78 +232,6 @@ The reviewer had no evidence for the following, and they should be checked by th
 | Role | Name | Decision | Date |
 | :--- | :--- | :--- | :--- |
 | Cloud Cybersecurity Lane | Idris | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
-| Cloud Engineering Lane | Alice | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
-
-**Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.---
-
-## 7. Security Review Record (2026-11-10)
-
-| Field | Value |
-| :--- | :--- |
-| **Review type** | AI-assisted review (Claude, Anthropic) of this document plus black-box tests run by the team in Cloud Shell |
-| **Scope** | Live Cloud Run service `canopycrew-api` (revision `canopycrew-api-00003-gth`, `us-central1`) and Firebase frontend `canopycrew-sp-mvp.web.app` |
-| **Status** | **CONDITIONAL. Not approved for sign-off** until the required remediations in 7.3 are complete and re-tested |
-| **Not a formal audit** | The reviewer cannot act as an approving authority. Approval below is reserved for the document owners |
-
-### 7.1 Verified controls (evidence from live tests)
-
-| Control | Evidence | Result |
-| :--- | :--- | :--- |
-| API reachable over HTTPS | `GET /` and `GET /health` return `200` | Verified |
-| Dockerfile-based build | Cloud Build step image is `gcr.io/cloud-builders/docker` | Verified |
-| Non-root runtime | `docker run --entrypoint id <live image digest>` returns `uid=999(appuser)` | Verified |
-| Strict input schema | Extra field `is_admin` returns `422` | Verified |
-| CORS allows production frontend | `Origin: https://canopycrew-sp-mvp.web.app` is allowed | Verified |
-| CORS blocks unrelated origins | `https://evil.example.com` receives no allow-origin header | Verified |
-| Methods restricted | Preflight returns `GET, POST, OPTIONS` only | Verified |
-| Catalog allow-list enforced | Unknown species ID returns `400` | Verified |
-
-### 7.2 Findings
-
-| ID | Severity | Finding | Status |
-| :--- | :--- | :--- | :--- |
-| F-1 | Medium | The CORS regex `^https://...\.run\.app$` allows any Cloud Run origin (`https://evil-test.run.app` received `access-control-allow-origin`). Impact is limited because `allow_credentials=False`, but it contradicts Section 4.2 | **Open** |
-| F-2 | Medium | The public API has no authentication, rate limit, or daily cap on NIM calls. Each request may consume NVIDIA credits. `--max-instances 2` limits instances, not request volume | **Open** |
-| F-3 | Medium | No upper bounds on string length or list size. A 1 MB `site_id` was accepted and parsed (response was a `404` lookup failure, not `422`) | **Open** |
-| F-4 | Low | `/docs`, `/redoc`, and `/openapi.json` return `200` (full API schema is public) | **Open: hide, or accept and document** |
-| F-5 | Low | No security response headers (HSTS, `X-Content-Type-Options`, `Cache-Control`, `Referrer-Policy`) | **Open** |
-| F-6 | Medium | Overhead-wire safety (`<= 5.0 m`) is **unverified**. The only test submitted `cecropia-hololeuca`, which returned `400` because the species is not in the catalog, not because of the height rule | **Open: test with a real tall species ID and a short control** |
-| F-7 | Info | Documentation inaccuracies (see 7.4) | **Open** |
-
-### 7.3 Required before sign-off
-
-1. Replace the `.run.app` CORS regex with an explicit origin list (`web.app`, `firebaseapp.com`, localhost). Re-test the hostile-origin case.
-2. Add `max_length`, an ID pattern, and a list-size cap to all request fields. Re-test with a 1 MB payload (expect `422`).
-3. Add a daily cap on NIM calls and a billing budget alert. Add App Check or authentication if volunteer accounts exist.
-4. Run the wire-safety test with real catalog IDs: tall species must return `400` with a wire-safety message, short species `200`.
-5. Decide on API docs exposure (disable in production, or record the decision here).
-6. Add security headers middleware.
-
-### 7.4 Corrections needed in this document
-
-- **Section 2.2:** Builds use the user-managed account `canopycrew-build` via `--build-service-account`, not the default Cloud Build Service Agent. List its exact roles (e.g., `run.admin`, `artifactregistry.writer`, `logging.logWriter`, and `iam.serviceAccountUser` on `canopycrew-runtime`) and the reason for each.
-- **Section 4.2:** Replace the CORS regex description after fixing F-1.
-- **Section 5:** Replace `cecropia-hololeuca` as the wire-safety example unless it is confirmed to exist in the catalog.
-- **Header table, `$0 Always Free Tier`:** Reword to "designed to stay within free-tier limits, with budget alerts". Artifact Registry storage, Cloud Build minutes, and egress can incur charges.
-- **Section 3:** Note that `:latest` secrets are read at instance start, so key rotation requires a new revision.
-
-### 7.5 Not verified by this review
-
-The reviewer had no evidence for the following, and they should be checked by the owners:
-
-- Actual IAM bindings (project-level roles on both service accounts, absence of Editor on the default Compute account)
-- Secret-scoped `secretAccessor` binding and secret version history
-- Absence of user-managed service account keys
-- Git history scanning for leaked keys (only a current-tree `grep` is documented)
-- Firestore security rules (if Firestore is used)
-- Dependency and image vulnerability scan results
-- Audit log configuration
-
-### 7.6 Approval
-
-| Role | Name | Decision | Date |
-| :--- | :--- | :--- | :--- |
-| Cloud Cybersecurity Lane | Idris | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
-| Cloud Engineering Lane | Alice | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
+| Cloud Engineering Lane | Alice | ☑ Approved | 2026-11-11 |
 
 **Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.

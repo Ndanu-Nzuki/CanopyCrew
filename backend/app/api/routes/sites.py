@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Path, status
 
 from app.schemas.plan import SiteArchetype
 from app.services.recommender import SiteNotFoundError, get_site_by_id, load_sites
@@ -18,7 +18,9 @@ def list_sites() -> List[SiteArchetype]:
     response_model=SiteArchetype,
     status_code=status.HTTP_200_OK,
 )
-def retrieve_site(site_id: str) -> SiteArchetype:
+def retrieve_site(
+    site_id: str = Path(..., min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$"),
+) -> SiteArchetype:
     try:
         return get_site_by_id(site_id)
     except SiteNotFoundError as exc:

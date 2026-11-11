@@ -17,7 +17,12 @@ from app.agent.narrative import (
     build_fallback_narrative,
     generate_volunteer_care_narrative,
 )
-from app.agent.nim_client import NIMClient, NIMClientError, _redact_secret
+from app.agent.nim_client import (
+    NIMClient,
+    NIMClientError,
+    _redact_secret,
+    reset_daily_nim_counter,
+)
 from app.agent.prompts import build_user_prompt
 from app.core.config import Settings
 from app.main import app
@@ -192,6 +197,32 @@ def test_redact_secret_scrubs_nvapi_tokens():
     assert raw not in scrubbed
     assert "nvapi-another-12345" not in scrubbed
     assert "nvapi-[REDACTED]" in scrubbed
+
+
+@pytest.mark.anyio
+async def test_nim_daily_call_cap_degrades_gracefully():
+    reset_daily_nim_counter()
+    capped_settings = Settings(
+        _env_file=None,
+        nvidia_api_key=SecretStr("nvapi-test-key-12345"),
+        nim_daily_call_cap=0,
+    )
+    capped_client = NIMClient(settings=capped_settings)
+    site = get_site_by_id("site-a-sidewalk-strip")
+    plan = calculate_volunteer_plan(
+        VolunteerPlanRequest(
+            site_id="site-a-sidewalk-strip",
+            selected_species_ids=["eugenia-uniflora"],
+        )
+    )
+    narrative = await generate_volunteer_care_narrative(
+        site=site,
+        plan=plan,
+        selected_species_ids=["eugenia-uniflora"],
+        client=capped_client,
+    )
+    assert "Community Planting & Care Guide" in narrative
+    reset_daily_nim_counter()
 
 
 def test_endpoint_volunteer_plan_with_narrative(monkeypatch):

@@ -25,7 +25,13 @@ router = APIRouter(tags=["plans"])
     status_code=status.HTTP_200_OK,
 )
 def recommend_species(
-    site_id: str = Query(..., min_length=1, description="Verified São Paulo site_id"),
+    site_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9-]+$",
+        description="Verified São Paulo site_id",
+    ),
 ) -> List[NativeSpecies]:
     try:
         return get_recommendations(site_id)

@@ -20,6 +20,39 @@ def test_health_endpoints() -> None:
             "status": "healthy",
             "app": "CanopyCrew API",
         }
+        assert response.headers.get("x-content-type-options") == "nosniff"
+        assert response.headers.get("x-frame-options") == "DENY"
+        assert response.headers.get("strict-transport-security") == "max-age=31536000; includeSubDomains"
+        assert response.headers.get("x-xss-protection") == "1; mode=block"
+        assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+        assert response.headers.get("cache-control") == "no-store"
+
+
+def test_cors_allows_firebase_hosting_origins() -> None:
+    for origin in (
+        "https://canopycrew-sp-mvp.web.app",
+        "https://canopycrew-sp-mvp.firebaseapp.com",
+    ):
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == origin
+
+
+def test_cors_rejects_hostile_cloud_run_origin() -> None:
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "https://evil-test.run.app",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_cors_allows_localhost_vite_origin() -> None:

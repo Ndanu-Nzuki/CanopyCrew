@@ -1,6 +1,8 @@
-from typing import Dict, List, Literal
+from typing import Annotated, Dict, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+CatalogSlugStr = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")]
 
 
 class SiteConstraints(BaseModel):
@@ -138,8 +140,25 @@ class NativeSpecies(BaseModel):
 class VolunteerPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    site_id: str = Field(min_length=1)
-    selected_species_ids: List[str] = Field(min_length=1)
+    site_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9-]+$",
+        description="Site archetype ID",
+        examples=["site-a-sidewalk-strip"],
+    )
+    selected_species_ids: List[CatalogSlugStr] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="List of selected native species IDs",
+    )
+    volunteer_name: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Optional volunteer identifier or name",
+    )
 
 
 class VolunteerPlanResponse(BaseModel):

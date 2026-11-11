@@ -140,23 +140,25 @@ All versioned endpoints are mounted under `/api/v1` (configured via `Settings.ap
 | `GET` | `/health` | `health.health` | `200` | Cloud Run liveness/readiness probe (`{"status": "healthy", "app": "CanopyCrew API"}`). |
 | `GET` | `/api/v1/health` | `health.health` | `200` | Versioned health check alias for frontend API clients. |
 | `GET` | `/api/v1/sites` | `sites.list_sites` | `200` | Returns all 3 verified São Paulo `SiteArchetype` objects. |
-| `GET` | `/api/v1/sites/{site_id}` | `sites.retrieve_site` | `200`, `404` | Returns a single `SiteArchetype` by `site_id` or `404` if unknown. |
+| `GET` | `/api/v1/sites/{site_id}` | `sites.retrieve_site` | `200`, `404`, `422` | Returns a single `SiteArchetype` by `site_id` (`max_length=64`, `^[a-z0-9-]+$`) or `404` if unknown. |
 | `GET` | `/api/v1/species` | `species.list_species` | `200` | Returns all 10 verified native Atlantic Forest `NativeSpecies` objects. |
-| `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404` | Returns a single `NativeSpecies` by `species_id` or `404` if unknown. |
+| `GET` | `/api/v1/species/{species_id}` | `species.retrieve_species` | `200`, `404`, `422` | Returns a single `NativeSpecies` by `species_id` (`max_length=64`, `^[a-z0-9-]+$`) or `404` if unknown. |
 | `GET` | `/api/v1/recommendations?site_id=...` | `plans.recommend_species` | `200`, `404`, `422` | Deterministically filters the 10-species catalog for municipal wire safety and site suitability. |
 | `POST` | `/api/v1/volunteer-plan` | `plans.create_volunteer_plan` | `200`, `400`, `404`, `422` | Validates selected species against site rules and computes seedling cost, Year-3 canopy (`m²`), volunteer care tasks, and optional `?include_narrative=true` care narrative. |
-| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic English fallback when unconfigured). |
+| `POST` | `/api/v1/volunteer-plan/narrative` | `plans.create_volunteer_plan_with_narrative` | `200`, `400`, `404`, `422` | Computes the deterministic volunteer plan and synthesizes `care_narrative` via NVIDIA NIM (or deterministic English fallback when unconfigured or capped at `nim_daily_call_cap=100`). |
 
 ---
 
 ## 6. CORS, Security & `$0` Cloud Run Deployment
 
-### CORS & Input Hardening
+### CORS, Security Headers & Input Hardening
 - **Explicit Allowed Origins (`backend/app/main.py` & `config.py`):**
   - Local Vite development server: `http://localhost:5173` and `http://127.0.0.1:5173` (always preserved even when custom `CORS_ORIGINS` are supplied).
-  - Production Google Cloud Run domains via regex: `^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$`.
+  - Production Firebase Hosting origins: `https://canopycrew-sp-mvp.web.app` and `https://canopycrew-sp-mvp.firebaseapp.com`.
+  - Service-scoped Google Cloud Run domains via regex: `^https://canopycrew-[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$`.
 - **Method & Credential Restrictions:** `allow_methods=["GET", "POST", "OPTIONS"]` and `allow_credentials=False`.
-- **Secret Isolation:** `Settings.nvidia_api_key` uses Pydantic's `SecretStr` so credentials never leak in stack traces or repr logs. `.env` files are strictly gitignored; production secrets are mounted exclusively from Google Secret Manager.
+- **OWASP Response Headers & Production Docs Toggle:** Middleware injects `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Cache-Control: no-store`. Interactive `/docs`, `/redoc`, and `/openapi.json` endpoints are automatically disabled when `APP_ENV` / `ENVIRONMENT == "production"`.
+- **Secret Isolation & Daily NIM Cap:** `Settings.nvidia_api_key` uses Pydantic's `SecretStr` so credentials never leak in stack traces or repr logs, and `NIMClient` enforces `nim_daily_call_cap = 100` calls/day (degrading gracefully to the deterministic care guide). `.env` files are strictly gitignored; production secrets are mounted exclusively from Google Secret Manager.
 
 ### Serverless Cloud Run Deployment Template (`$0` Spend Guardrail)
 Deployments bind to `PORT` (injected automatically by Cloud Run as `8080`, mapped via `AliasChoices("PORT", "API_PORT")` in `config.py`), run as an unprivileged container user (`appuser`), and enforce zero-instance scale-down in an **Always Free Tier** region (`us-central1`) inside the isolated `canopycrew-sp-mvp` project:

@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     # Application metadata
     app_name: str = "CanopyCrew API"
     app_version: str = "0.1.0"
-    app_env: str = "development"
+    app_env: str = Field(
+        default="development",
+        validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT"),
+    )
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
 
@@ -37,19 +40,22 @@ class Settings(BaseSettings):
     # Data directory for deterministic static JSON datasets (sites.json, species.json)
     data_dir: Path = BACKEND_DIR / "data"
 
-    # CORS: explicitly allow Vite local dev and production Cloud Run domains
+    # CORS: explicitly allow Vite local dev and production Firebase Hosting domains
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "https://canopycrew-sp-mvp.web.app",
+            "https://canopycrew-sp-mvp.firebaseapp.com",
         ]
     )
-    cors_origin_regex: str = r"^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$"
+    cors_origin_regex: str = r"^https://canopycrew-[a-z0-9-]+(\.[a-z0-9-]+)*\.run\.app$"
 
     # Optional NVIDIA NIM integration (injected via Google Secret Manager in production)
     nvidia_api_key: SecretStr | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
+    nim_daily_call_cap: int = Field(default=100, ge=0)
 
     @property
     def has_nvidia_api_key(self) -> bool:

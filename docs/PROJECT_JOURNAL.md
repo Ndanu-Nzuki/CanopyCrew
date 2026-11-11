@@ -96,6 +96,17 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Security (`@Idris`):** Keeps all `NVIDIA_API_KEY` handling strictly server-side (`SecretStr` / Google Secret Manager) with `0` user-managed Service Account JSON keys (`google-cloud-recipe-auth`); the browser client only sends `{site_id, selected_species_ids}`.
 - **Verification:** `pytest -v` (`28 passed` across `test_health.py`, `test_endpoints.py`, and `test_agent.py`), live NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`) care narrative verification, and `npm --prefix frontend run build` (`vite build` succeeded cleanly).
 
+### [2026-11-08] — PR #14: fix(frontend): map unique botanical images to species and site cards (`fix/frontend-card-images-rotation`)
+- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering) & Laurine Ndanu Nzuki (AI Research / Lead)
+- **Changes Delivered:**
+  - Created `frontend/src/data/plantimages.jsx` with `getPlantImage(plant, index)` mapping all 10 verified native *Mata Atlântica* `species_id` slugs to distinct open-licensed botanical photographs.
+  - Replaced the 3-photo modulo rotation in `frontend/src/components/plantcatalogue.jsx` with deterministic `species_id` lookup and `loading="lazy"` image rendering.
+  - Added `getSiteImage(site, index)` in `frontend/src/data/siteimages.jsx` and wired consistent `site_id` image resolution across `frontend/src/components/discover.jsx` and `frontend/src/components/sitedetail.jsx`.
+- **Cross-Lane Unblocks:**
+  - **Frontend (`@Laurine`):** Eliminates duplicate species card thumbnails in `PlantCatalogue` and guarantees identical site archetype imagery between `Discover` cards and the `SiteDetail` drawer.
+  - **Product Brief (`@Barbara`):** Enhances visual polish and botanical accuracy for the 10 native *Mata Atlântica* species and 3 São Paulo urban site archetypes in demo walkthroughs.
+- **Verification:** `npm --prefix frontend run build` (`vite build` succeeded cleanly) and verified distinct image URLs for all 10 `species_id` and 3 `site_id` keys.
+
 ### [2026-11-11] — fix(backend): add security headers, bound input lengths, and resolve F-1..F-7 (`fix/backend-security-hardening`)
 - **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering) & Idris Belgore Abiodun (Cloud Cybersecurity)
 - **Changes Delivered:**

@@ -194,3 +194,15 @@ def test_volunteer_plan_empty_species_list_raises_422() -> None:
     )
     assert response.status_code == 422
 
+
+def test_volunteer_plan_exceeding_max_length_raises_422() -> None:
+    response = client.post(
+        "/api/v1/volunteer-plan",
+        json={
+            "site_id": "x" * 65,
+            "selected_species_ids": ["eugenia-uniflora"],
+        },
+    )
+    assert response.status_code == 422
+
+

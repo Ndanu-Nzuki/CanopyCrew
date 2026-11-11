@@ -7,6 +7,7 @@ Injects credentials strictly via environment variables / Google Secret Manager.
 
 import logging
 import re
+from datetime import date
 from typing import Optional
 
 import httpx
@@ -16,6 +17,15 @@ from app.core.config import Settings, get_settings
 logger = logging.getLogger("canopycrew.agent.nim")
 
 _NVAPI_TOKEN_PATTERN = re.compile(r"nvapi-[A-Za-z0-9_\-]+")
+_daily_call_date: date = date.today()
+_daily_call_count: int = 0
+
+
+def reset_daily_nim_counter() -> None:
+    """Reset the in-memory daily NIM call counter (used in tests)."""
+    global _daily_call_date, _daily_call_count
+    _daily_call_date = date.today()
+    _daily_call_count = 0
 
 
 def _redact_secret(text: str, raw_key: Optional[str] = None) -> str:
@@ -65,8 +75,21 @@ class NIMClient:
         max_tokens: int = 800,
     ) -> str:
         """Call NVIDIA NIM chat completions API and return text response."""
+        global _daily_call_date, _daily_call_count
         if not self.is_configured:
             raise NIMClientError("NVIDIA_API_KEY is not configured in environment.")
+
+        today = date.today()
+        if _daily_call_date != today:
+            _daily_call_date = today
+            _daily_call_count = 0
+
+        cap = self._settings.nim_daily_call_cap
+        if _daily_call_count >= cap:
+            raise NIMClientError(
+                f"Daily NVIDIA NIM call cap ({cap}) reached; degrading to deterministic guide."
+            )
+        _daily_call_count += 1
 
         api_key = self._settings.nvidia_api_key.get_secret_value()
         endpoint = f"{self.base_url}/chat/completions"

@@ -174,7 +174,7 @@ erDiagram
 ```
 
 ### 4.4 Deterministic Species Recommendations — `GET /api/v1/recommendations`
-- **Query Parameter:** `site_id` (required `string`, `min_length=1`).
+- **Query Parameter:** `site_id` (required `string`, `min_length=1`, `max_length=64`, `pattern=r"^[a-z0-9-]+$"`).
 - **Deterministic Filtering Rules (`recommender.get_recommendations`):**
   1. Looks up `site_id` (`404` if not one of the 3 verified archetypes).
   2. Rejects any species failing `_satisfies_wire_safety(site, species)`.
@@ -186,13 +186,14 @@ erDiagram
 
 ### 4.5 Volunteer Plan Calculation — `POST /api/v1/volunteer-plan` & `POST /api/v1/volunteer-plan/narrative`
 
-- **Optional Query Parameter on `POST /api/v1/volunteer-plan`:** `include_narrative` (`boolean`, default `false`). When `true` (or when calling `POST /api/v1/volunteer-plan/narrative`), `care_narrative` is populated via `generate_volunteer_care_narrative()` using NVIDIA NIM (`meta/llama-3.1-70b-instruct`) with deterministic Portuguese fallback (`build_fallback_narrative()`).
+- **Optional Query Parameter on `POST /api/v1/volunteer-plan`:** `include_narrative` (`boolean`, default `false`). When `true` (or when calling `POST /api/v1/volunteer-plan/narrative`), `care_narrative` is populated via `generate_volunteer_care_narrative()` using NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`, bounded by `nim_daily_call_cap = 100` calls/day) with deterministic English + Brazilian Portuguese botanical fallback (`build_fallback_narrative()`).
 
 #### Request Body (`VolunteerPlanRequest`)
 | Field | Type | Validation | Description |
 | :--- | :--- | :--- | :--- |
-| `site_id` | `string` | `min_length=1`, `extra="forbid"` | Target São Paulo site archetype ID. |
-| `selected_species_ids` | `list[string]` | `min_length=1`, `extra="forbid"` | Non-empty array of `species_id` slugs chosen for planting. |
+| `site_id` | `string` | `min_length=1`, `max_length=64`, `pattern=r"^[a-z0-9-]+$"`, `extra="forbid"` | Target São Paulo site archetype ID. |
+| `selected_species_ids` | `list[CatalogSlugStr]` | `min_length=1`, `max_length=10` items (each `1..64` chars, `^[a-z0-9-]+$`), `extra="forbid"` | Non-empty array of `species_id` slugs chosen for planting. |
+| `volunteer_name` | `string \| null` | Optional (`default=None`), `max_length=100`, `extra="forbid"` | Optional volunteer or neighborhood group name. |
 
 ```json
 {

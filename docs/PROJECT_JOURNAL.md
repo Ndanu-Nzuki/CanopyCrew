@@ -96,4 +96,17 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Security (`@Idris`):** Keeps all `NVIDIA_API_KEY` handling strictly server-side (`SecretStr` / Google Secret Manager) with `0` user-managed Service Account JSON keys (`google-cloud-recipe-auth`); the browser client only sends `{site_id, selected_species_ids}`.
 - **Verification:** `pytest -v` (`28 passed` across `test_health.py`, `test_endpoints.py`, and `test_agent.py`), live NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`) care narrative verification, and `npm --prefix frontend run build` (`vite build` succeeded cleanly).
 
+### [2026-11-11] — fix(backend): add security headers, bound input lengths, and resolve F-1..F-7 (`fix/backend-security-hardening`)
+- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering) & Idris Belgore Abiodun (Cloud Cybersecurity)
+- **Changes Delivered:**
+  - Injected OWASP & review-mandated response headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `X-XSS-Protection`, `Referrer-Policy`, `Cache-Control: no-store`) and environment-conditional disabling of `/docs`, `/redoc`, and `/openapi.json` when `ENVIRONMENT=production` in `backend/app/main.py` (**Resolves F-4 & F-5**).
+  - Enforced strict length (`max_length=64`), list size (`max_length=10`), and slug regex (`^[a-z0-9-]+$`) bounds across `VolunteerPlanRequest` (`backend/app/schemas/plan.py`) and path/query parameters (`sites.py`, `species.py`, `plans.py`), scoped the Cloud Run CORS regex to `canopycrew-*` (`backend/app/core/config.py`), and added `nim_daily_call_cap=100` with deterministic fallback in `NIMClient` (**Resolves F-1, F-2, & F-3**).
+  - Deduplicated Section 7 in `docs/SECURITY.md` (following PR #20), applied Section 7.4 documentation corrections (`canopycrew-build`, `:latest` secret rotation note, `cecropia-pachystachya` wire-safety verification), and marked `F-1` through `F-7` as **Resolved**.
+- **Cross-Lane Unblocks:**
+  - **Security (`@Idris`):** Remediates all 6 required items in `docs/SECURITY.md` Section 7.3 with automated regression tests ready for Cloud Run re-test and Section 7.6 sign-off.
+  - **Frontend (`@Laurine`):** Explicitly allowlists both production Firebase Hosting domains (`https://canopycrew-sp-mvp.web.app` and `https://canopycrew-sp-mvp.firebaseapp.com`) while blocking third-party `.run.app` origins.
+  - **Product Brief (`@Barbara`):** Strengthens GCLP x MMC rubric Pillar 3 & Pillar 4 with verified defense-in-depth perimeter controls and daily NVIDIA NIM quota protection (`nim_daily_call_cap=100`).
+- **Verification:** `pytest -v` (`32 passed` across `test_health.py`, `test_endpoints.py`, and `test_agent.py`, including hostile `.run.app` CORS rejection, `422` length-bound validation, OWASP header assertions, and daily NIM cap fallback).
+
+
 

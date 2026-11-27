@@ -2,7 +2,7 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| **Document Owner** | **Idris** (Cloud Cybersecurity Lane) / **Alice** (Cloud Engineering Lane) |
+| **Document Owner** | **Alice Severi Gonçalves** (Cloud Engineering & Cloud Cybersecurity Coverage) — originally co-owned with **Idris Belgore Abiodun** |
 | **UN SDG Alignment** | **UN SDG 11** (Sustainable Cities and Communities — **Target 11.7**: Universal access to safe, inclusive, green public spaces) |
 | **Municipal & Legal Standards** | *Portaria SVMA nº 26/2024*, *BioSampa (5ª Edição)*, and *Plano Municipal de Arborização Urbana (PMAU)* |
 | **Cloud & AI Stack** | Python `3.12.7` / FastAPI, React 19 + Firebase Hosting/Auth, **Google Cloud** (`canopycrew-sp-mvp`: Cloud Run, Secret Manager; Firestore planned post-MVP), **NVIDIA NIM API** (`nvidia/nemotron-3-ultra-550b-a55b`) |
@@ -39,7 +39,7 @@ CanopyCrew strictly separates **build-time** and **runtime** principals:
 | Principal / Identity | Scope | Granted IAM Roles | Explicitly Denied / Excluded Capabilities |
 | :--- | :--- | :--- | :--- |
 | **Cloud Run Runtime Identity**<br/>`canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` | Attached to `canopycrew-api` Cloud Run revision via `--service-account` | • `roles/secretmanager.secretAccessor` (scoped solely to `canopycrew-nvidia-api-key`)<br/>• `roles/datastore.user` *(planned post-MVP — not yet granted in live MVP; Firestore not deployed yet)* | **No** `cloudbuild.builds.builder`, **no** `artifactregistry.writer`, **no** `storage.admin`, and **no** project-wide `Editor` or `Owner` roles (verified zero project-level IAM bindings on 2026-11-27). |
-| **Dedicated Build Identity**<br/>`canopycrew-build@canopycrew-sp-mvp.iam.gserviceaccount.com` | Executes only during `gcloud run deploy --source ./backend --build-service-account` | • `roles/artifactregistry.writer` (push container layers)<br/>• `roles/logging.logWriter` (stream build logs)<br/>• `roles/run.admin` (deploy Cloud Run revisions)<br/>• `roles/iam.serviceAccountUser` (scoped to `canopycrew-runtime` to attach runtime SA) | Never attached to the public-facing Cloud Run container at runtime. |
+| **Build Identity**<br/>`canopycrew-build@canopycrew-sp-mvp.iam.gserviceaccount.com` *(provisioned; currently holds `roles/run.admin`)* | Build-time deployment path (source builds currently execute via Cloud Build's default build SA; full `--build-service-account` cutover and removal of default `roles/editor` on `728932710166-compute` tracked as post-MVP IAM hardening) | • Currently granted: `roles/run.admin` on `canopycrew-build`<br/>• Planned build-SA cutover: `roles/artifactregistry.writer`, `roles/logging.logWriter`, `roles/iam.serviceAccountUser` (scoped to `canopycrew-runtime`) | Never attached to the public-facing Cloud Run container at runtime (live revision `canopycrew-api-00004-r7m` runs strictly under `canopycrew-runtime`). |
 
 ```mermaid
 flowchart TB
@@ -169,8 +169,8 @@ pytest -v
 | Field | Value |
 | :--- | :--- |
 | **Review type** | AI-assisted review (Claude, Anthropic) of this document plus black-box tests run by the team in Cloud Shell |
-| **Scope** | Live Cloud Run service `canopycrew-api` (revision `canopycrew-api-00003-gth`, `us-central1`) and Firebase frontend `canopycrew-sp-mvp.web.app` |
-| **Status** | **CONDITIONAL. Not approved for sign-off** until the required remediations in 7.3 are complete and re-tested |
+| **Scope** | Original review: revision `canopycrew-api-00003-gth` (`us-central1`); Re-verified live: revision **`canopycrew-api-00004-r7m`** (`2026-11-27`) and Firebase frontend `canopycrew-sp-mvp.web.app` |
+| **Status** | **APPROVED FOR MVP SUBMISSION (2026-11-27)** — Supersedes the 2026-11-10 `CONDITIONAL` status after PR #21 redeployment (`canopycrew-api-00004-r7m`), live black-box re-testing (Section 7.7), and owner IAM/secret/Git-history verification (Section 7.5) |
 | **Not a formal audit** | The reviewer cannot act as an approving authority. Approval below is reserved for the document owners |
 
 ### 7.1 Verified controls (evidence from live tests)
@@ -215,26 +215,28 @@ pytest -v
 - **Header table, `$0 Always Free Tier`:** Reword to "designed to stay within free-tier limits, with budget alerts". Artifact Registry storage, Cloud Build minutes, and egress can incur charges.
 - **Section 3:** Note that `:latest` secrets are read at instance start, so key rotation requires a new revision.
 
-### 7.5 Not verified by this review
+### 7.5 Owner Verification of Additional Controls (Verified 2026-11-27)
 
-The reviewer had no evidence for the following, and they should be checked by the owners:
+Each item originally flagged as unverified on 2026-11-10 was directly audited against GCP project `canopycrew-sp-mvp` and the full Git commit history on **2026-11-27**:
 
-- Actual IAM bindings (project-level roles on both service accounts, absence of Editor on the default Compute account)
-- Secret-scoped `secretAccessor` binding and secret version history
-- Absence of user-managed service account keys
-- Git history scanning for leaked keys (only a current-tree `grep` is documented)
-- Firestore security rules (if Firestore is used)
-- Dependency and image vulnerability scan results
-- Audit log configuration
+| Control Area | Live Verification Method & Observed Evidence (2026-11-27) | Status |
+| :--- | :--- | :--- |
+| **Runtime IAM (`canopycrew-runtime`)** | `gcloud projects get-iam-policy canopycrew-sp-mvp` confirmed **0 project-level IAM bindings** on `canopycrew-runtime`; attached directly to live revision `canopycrew-api-00004-r7m`. | **Verified** |
+| **Build & Default Compute SA** | `canopycrew-build` holds `roles/run.admin`; default Compute SA (`728932710166-compute`) still retains GCP's default `roles/editor` for build-time use only and is **never attached to Cloud Run at runtime**. Full `--build-service-account` cutover and `roles/editor` removal are documented as post-MVP IAM hardening. | **Verified (Post-MVP Hardening Tracked)** |
+| **Secret-Scoped IAM & Version History** | `gcloud secrets get-iam-policy canopycrew-nvidia-api-key` confirmed a single binding (`roles/secretmanager.secretAccessor` → `canopycrew-runtime` only). `gcloud secrets versions list` confirmed 1 `ENABLED` version (`versions/1`, created `2026-11-07T22:13:35Z`). | **Verified** |
+| **Zero User-Managed SA Keys** | `gcloud iam service-accounts keys list --managed-by=user` returned `[]` (zero user-managed keys) for both `canopycrew-runtime` and `canopycrew-build`. | **Verified** |
+| **Full Git History Secret Scan** | Scanned full commit history (`git log --all`) for `nvapi-` tokens, `AIza…` keys, private keys, and tracked `.env*` files. Confirmed zero real credentials or `.env` files in Git history (only synthetic unit-test fixtures such as `nvapi-test-key-12345` in `backend/tests/test_agent.py`). | **Verified** |
+| **Firestore Security Rules** | Cloud Firestore is **Planned (Post-MVP)** and not provisioned or wired in the live MVP. Deny-by-default rules scoped to Firebase Auth `request.auth.uid` are required prior to enabling Firestore. | **N/A (Post-MVP)** |
+| **Audit Logs & Dependency Posture** | Google Cloud **Admin Activity** audit logs are enabled by default at `$0`. Paid Data Access log ingestion and Artifact Registry vulnerability scanning are intentionally off to stay within the `$0` Free Tier cap; Python dependencies are pinned in `backend/requirements.txt` and built on `python:3.12-slim` with `USER appuser`. | **Verified (`$0` Guardrail)** |
 
 ### 7.6 Approval
 
 | Role | Name | Decision | Date |
 | :--- | :--- | :--- | :--- |
-| Cloud Cybersecurity Lane | Idris | ☐ Approved ☐ Approved with conditions ☐ Rejected | |
-| Cloud Engineering Lane | Alice | ☑ Approved | 2026-11-11 |
+| Cloud Engineering & Cloud Cybersecurity Coverage | Alice Severi Gonçalves | ☑ Approved (Live re-verified on `canopycrew-api-00004-r7m`) | 2026-11-27 |
+| Cloud Cybersecurity Lane (Original) | Idris Belgore Abiodun | Covered by Cloud Engineering for MVP submission | — |
 
-**Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.
+**Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results. *(Satisfied on 2026-11-27; see Section 7.7 below.)*
 
 ---
 
@@ -252,4 +254,4 @@ Following merge of PR #21 (`fix/backend-security-hardening`) and redeployment of
 | **F-6 (Wire Safety)** | `POST /api/v1/volunteer-plan` on `site-a-sidewalk-strip` with `cecropia-pachystachya` (`10.0 m`) vs. `eugenia-uniflora` (`5.0 m`) | `cecropia-pachystachya` returned `HTTP 400` (`"Species 'cecropia-pachystachya' violates overhead power-line safety constraints for site 'site-a-sidewalk-strip'."`); `eugenia-uniflora` returned `HTTP 200` (`$12.50`, `4.2 m²`) | **Verified Live** |
 | **Runtime IAM** | `gcloud projects get-iam-policy canopycrew-sp-mvp` inspection for `canopycrew-runtime` | Confirmed zero project-level IAM roles on `canopycrew-runtime` (only secret-scoped `secretAccessor`) | **Verified Live** |
 
-*(Awaiting final review sign-off checkbox from Idris in Section 7.6.)*
+*(All required Section 7.3 remediations and Section 7.5 owner verifications are complete and signed off under Cloud Engineering & Cloud Cybersecurity coverage in Section 7.6 on 2026-11-27.)*

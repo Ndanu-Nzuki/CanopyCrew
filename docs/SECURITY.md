@@ -5,7 +5,7 @@
 | **Document Owner** | **Idris** (Cloud Cybersecurity Lane) / **Alice** (Cloud Engineering Lane) |
 | **UN SDG Alignment** | **UN SDG 11** (Sustainable Cities and Communities — **Target 11.7**: Universal access to safe, inclusive, green public spaces) |
 | **Municipal & Legal Standards** | *Portaria SVMA nº 26/2024*, *BioSampa (5ª Edição)*, and *Plano Municipal de Arborização Urbana (PMAU)* |
-| **Cloud & AI Stack** | Python `3.12.7` / FastAPI, **Google Cloud** (`canopycrew-sp-mvp`: Cloud Run, Secret Manager, Firestore), **NVIDIA NIM API** |
+| **Cloud & AI Stack** | Python `3.12.7` / FastAPI, React 19 + Firebase Hosting/Auth, **Google Cloud** (`canopycrew-sp-mvp`: Cloud Run, Secret Manager; Firestore planned post-MVP), **NVIDIA NIM API** (`nvidia/nemotron-3-ultra-550b-a55b`) |
 | **Financial & Security Posture** | **Zero Hardcoded Secrets**, **Least-Privilege IAM**, **Non-Root Container Runtime**, **Designed to stay within Free-Tier limits with budget alerts** |
 
 > **GitHub Web Editor Tip:** Any teammate can view or edit this document directly in the browser without terminal commands by pressing `.` on the CanopyCrew GitHub repository page.
@@ -38,7 +38,7 @@ CanopyCrew strictly separates **build-time** and **runtime** principals:
 
 | Principal / Identity | Scope | Granted IAM Roles | Explicitly Denied / Excluded Capabilities |
 | :--- | :--- | :--- | :--- |
-| **Cloud Run Runtime Identity**<br/>`canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` | Attached to `canopycrew-api` Cloud Run revision via `--service-account` | • `roles/secretmanager.secretAccessor` (scoped solely to `canopycrew-nvidia-api-key`)<br/>• `roles/datastore.user` (optional, for `<= 1 GiB` Firestore community plans) | **No** `cloudbuild.builds.builder`, **no** `artifactregistry.writer`, **no** `storage.admin`, and **no** project-wide `Editor` or `Owner` roles. |
+| **Cloud Run Runtime Identity**<br/>`canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` | Attached to `canopycrew-api` Cloud Run revision via `--service-account` | • `roles/secretmanager.secretAccessor` (scoped solely to `canopycrew-nvidia-api-key`)<br/>• `roles/datastore.user` *(planned post-MVP — not yet granted in live MVP; Firestore not deployed yet)* | **No** `cloudbuild.builds.builder`, **no** `artifactregistry.writer`, **no** `storage.admin`, and **no** project-wide `Editor` or `Owner` roles (verified zero project-level IAM bindings on 2026-11-27). |
 | **Dedicated Build Identity**<br/>`canopycrew-build@canopycrew-sp-mvp.iam.gserviceaccount.com` | Executes only during `gcloud run deploy --source ./backend --build-service-account` | • `roles/artifactregistry.writer` (push container layers)<br/>• `roles/logging.logWriter` (stream build logs)<br/>• `roles/run.admin` (deploy Cloud Run revisions)<br/>• `roles/iam.serviceAccountUser` (scoped to `canopycrew-runtime` to attach runtime SA) | Never attached to the public-facing Cloud Run container at runtime. |
 
 ```mermaid
@@ -48,7 +48,7 @@ flowchart TB
         AR[("Artifact Registry<br/>Container Images")]
         SA["canopycrew-runtime Service Account<br/>(Runtime Least-Privilege Identity)"]
         GSM["Google Secret Manager<br/>canopycrew-nvidia-api-key"]
-        FS[("Cloud Firestore<br/>Community Plans <= 1 GiB")]
+        FS[("Cloud Firestore<br/>Planned Post-MVP (<= 1 GiB)")]
         CR["Cloud Run Service: canopycrew-api<br/>USER appuser (Non-Root)<br/>min-instances: 0 | max-instances: 2"]
     end
 
@@ -56,7 +56,7 @@ flowchart TB
     AR -->|"2. Pulls Immutable Image"| CR
     SA -.->|"3. Attached Runtime Identity"| CR
     GSM -->|"4. roles/secretmanager.secretAccessor<br/>(Secret-Scoped)"| SA
-    SA -.->|"5. roles/datastore.user<br/>(Optional Persistence)"| FS
+    SA -.->|"5. roles/datastore.user<br/>(Planned Post-MVP)"| FS
 ```
 
 ### 2.3 Keyless Authentication, ADC & Service Account Impersonation
@@ -235,3 +235,21 @@ The reviewer had no evidence for the following, and they should be checked by th
 | Cloud Engineering Lane | Alice | ☑ Approved | 2026-11-11 |
 
 **Re-review trigger:** Complete 7.3 items 1–6, redeploy, re-run the original tests (hostile origin, oversized input, docs exposure, wire-safety pair), and update Sections 7.1 and 7.2 with the new results.
+
+---
+
+### 7.7 Live Re-Test Verification Record (2026-11-27 — Revision `canopycrew-api-00004-r7m`)
+
+Following merge of PR #21 (`fix/backend-security-hardening`) and redeployment of `canopycrew-api` to revision **`canopycrew-api-00004-r7m`** (`us-central1`, `canopycrew-sp-mvp`, `APP_ENV=production`, `DEBUG=false`, `NVIDIA_MODEL=nvidia/nemotron-3-ultra-550b-a55b`, `canopycrew-runtime` SA), the live black-box tests specified in Section 7.6 were re-run against `https://canopycrew-api-sb77peq6bq-uc.a.run.app`:
+
+| Finding | Re-Test Check (Live `canopycrew-api-00004-r7m`) | Observed Live Result | Status |
+| :--- | :--- | :--- | :--- |
+| **F-1 (CORS)** | `Origin: https://evil-test.run.app` and `https://evil.example.com` vs. `https://canopycrew-sp-mvp.web.app` and `https://canopycrew-sp-mvp.firebaseapp.com` | Both Firebase Hosting origins returned matching `access-control-allow-origin`; both hostile origins received **no** `access-control-allow-origin` header | **Verified Live** |
+| **F-2 (NIM Cap)** | `nim_daily_call_cap=100` active in `NIMClient` with automatic deterministic fallback | Deployed in revision `00004-r7m` (covered by unit test `test_nim_daily_call_cap_degrades_gracefully`) | **Deployed & Unit-Tested** |
+| **F-3 (Input Bounds)** | `POST /api/v1/volunteer-plan` with 200-char `site_id`, extra field `is_admin: true`, and 11 species (`> max_length=10`) | All three requests returned `HTTP 422 Unprocessable Entity` | **Verified Live** |
+| **F-4 (Docs Toggle)** | `GET /docs`, `GET /redoc`, `GET /openapi.json` | All three returned `HTTP 404 Not Found` | **Verified Live** |
+| **F-5 (OWASP Headers)** | `GET /api/v1/health` response headers | `HTTP 200` with `x-content-type-options: nosniff`, `x-frame-options: DENY`, `strict-transport-security: max-age=31536000; includeSubDomains`, `x-xss-protection: 1; mode=block`, `referrer-policy: strict-origin-when-cross-origin`, and `cache-control: no-store` | **Verified Live** |
+| **F-6 (Wire Safety)** | `POST /api/v1/volunteer-plan` on `site-a-sidewalk-strip` with `cecropia-pachystachya` (`10.0 m`) vs. `eugenia-uniflora` (`5.0 m`) | `cecropia-pachystachya` returned `HTTP 400` (`"Species 'cecropia-pachystachya' violates overhead power-line safety constraints for site 'site-a-sidewalk-strip'."`); `eugenia-uniflora` returned `HTTP 200` (`$12.50`, `4.2 m²`) | **Verified Live** |
+| **Runtime IAM** | `gcloud projects get-iam-policy canopycrew-sp-mvp` inspection for `canopycrew-runtime` | Confirmed zero project-level IAM roles on `canopycrew-runtime` (only secret-scoped `secretAccessor`) | **Verified Live** |
+
+*(Awaiting final review sign-off checkbox from Idris in Section 7.6.)*

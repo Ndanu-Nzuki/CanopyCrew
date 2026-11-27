@@ -7,7 +7,8 @@ Google Cloud Launchpad × Mentor Me Collective Capstone Project
 - **Live MVP (Web App):** [https://canopycrew-sp-mvp.web.app/](https://canopycrew-sp-mvp.web.app/) (Firebase Hosting)
 - **Live Backend API:** [https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1/health](https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1/health) (Google Cloud Run)
 - **Presentation deck:** Open `CanopyCrew_Presentation.pptx` in the [Product Brief and Deck folder](https://drive.google.com/drive/folders/1aBnbM3tLjXYjOd_5hko-z-eBdd98buj5).
-- **Recorded walkthrough:** Link pending — recording in progress.
+- **Recorded walkthrough:** Open `CanopyCrew Walk-through` in the [Walk-Through_folder]
+(https://drive.google.com/file/d/16BO8_S8Tj_HOWs15IKDOagATUU-RHGRZ/view?usp=drive_link)
 
 ## About CanopyCrew
 

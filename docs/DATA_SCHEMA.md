@@ -6,7 +6,7 @@
 | **Validation Engine** | **Pydantic v2** (`pydantic==2.14.2`, strict `ConfigDict(extra="forbid")` on all models) |
 | **Canonical Datasets** | `backend/data/sites.json` (3 archetypes) & `backend/data/species.json` (10 native species) |
 | **Municipal Standards** | *Portaria SVMA nº 26/2024*, *BioSampa (5ª Edição)*, and *Plano Municipal de Arborização Urbana (PMAU)* |
-| **Storage Budget** | **`$0` Spend** — Static validated JSON in Git + optional Cloud Firestore (`<= 1 GiB` Free Tier; no paid SQL databases) |
+| **Storage Budget** | **`$0` Spend** — Static validated JSON in Git + browser `localStorage` (Live MVP); Cloud Firestore (`<= 1 GiB` Free Tier) planned post-MVP (zero SQL databases) |
 
 > **GitHub Web Editor Tip:** Press `.` in the GitHub repository view to inspect or update this contract in the browser without local setup.
 
@@ -18,7 +18,7 @@ CanopyCrew stores its reference botanical and urban site catalogs as version-con
 
 1. **Zero Unverified Fields (`extra="forbid"`):** Every Pydantic model enforces `ConfigDict(extra="forbid")`. Any unexpected property in JSON seed files or client `POST` bodies immediately raises a validation error (`HTTP 422` on API requests).
 2. **Deterministic Legal Compliance:** Every species record encodes explicit municipal citations (`municipal_compliance`), physical stature (`mature_height_meters`), overhead wire compatibility (`sidewalk_wire_safe`), and pre-reviewed site suitability (`suitable_site_ids`).
-3. **`$0` Cloud Persistence:** Static reference catalogs require zero database spend. Saved community volunteer plans map 1:1 from `VolunteerPlanResponse` into Google Cloud Firestore (`volunteer_plans` collection, capped within the **1 GiB Free Tier**) while **NVIDIA NIM** (`backend/app/agent/`) consumes the validated response purely to synthesize natural-language volunteer care narratives.
+3. **`$0` Persistence (Deployed vs. Planned):** In the **live MVP**, static reference catalogs are validated from Git-versioned JSON (`@lru_cache`) with zero database spend, while user workspace selections and care checkoffs persist locally in browser `localStorage` alongside Firebase Auth (`firebase/auth`), and **NVIDIA NIM** (`backend/app/agent/`, `nvidia/nemotron-3-ultra-550b-a55b`) consumes the validated `VolunteerPlanResponse` strictly to synthesize natural-language care narratives. **Planned post-MVP:** Google Cloud Firestore (`volunteer_plans` collection, capped within the **1 GiB Free Tier**) will enable cross-device persistence of saved community plans and shared neighborhood checklists (not wired in the live MVP yet).
 
 ```mermaid
 erDiagram
@@ -263,9 +263,9 @@ erDiagram
 
 ---
 
-## 5. Cloud Firestore & NVIDIA NIM Extension Contract
+## 5. NVIDIA NIM (Deployed) & Cloud Firestore (Planned) Extension Contract
 
-To support persistence and AI care narratives without breaking frontend integration or deterministic guarantees:
-- **Cloud Firestore Document (`volunteer_plans/{plan_id}`):** Stores the validated `VolunteerPlanResponse` payload plus server-generated `created_at` (ISO-8601 UTC timestamp) within the **`$0` Free Tier (`<= 1 GiB` storage)**.
-- **NVIDIA NIM Narrative Integration (`backend/app/agent/`):** Consumes `SiteArchetype` + `VolunteerPlanResponse` as read-only prompt context to return an optional natural-language `care_narrative` string while keeping `total_seedling_cost_usd`, `projected_canopy_m2_year_3`, and species eligibility strictly governed by `recommender.py`.
+To support AI care narratives today and cross-device persistence post-MVP without breaking frontend integration or deterministic guarantees:
+- **NVIDIA NIM Narrative Integration — Deployed (Live MVP) (`backend/app/agent/`):** Consumes `SiteArchetype` + `VolunteerPlanResponse` as read-only prompt context (`nvidia/nemotron-3-ultra-550b-a55b`, capped at `nim_daily_call_cap = 100`/day with deterministic English fallback) to return an optional natural-language `care_narrative` string while keeping `total_seedling_cost_usd`, `projected_canopy_m2_year_3`, and species eligibility strictly governed by `recommender.py`.
+- **Cloud Firestore Document (`volunteer_plans/{plan_id}`) — Planned (Post-MVP, Not Deployed Yet):** Designed to store the validated `VolunteerPlanResponse` payload plus server-generated `created_at` (ISO-8601 UTC timestamp) within the **`$0` Free Tier (`<= 1 GiB` storage)**.
 

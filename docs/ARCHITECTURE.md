@@ -5,8 +5,8 @@
 | **Document Owner** | **Alice** (Cloud Engineering Lane) |
 | **UN SDG Alignment** | **UN SDG 11** (Sustainable Cities and Communities — **Target 11.7**: Universal access to safe, inclusive, green public spaces) |
 | **Municipal Standards** | *Portaria SVMA nº 26/2024*, *BioSampa (5ª Edição)*, and *Plano Municipal de Arborização Urbana (PMAU)* |
-| **Runtime & Cloud Stack** | Python `3.12.7` / FastAPI, React + Vite, **Google Cloud** (Cloud Run + Cloud Firestore + Secret Manager), **NVIDIA NIM API** |
-| **Spend Policy** | Strictly **`$0` Free Tier** (`--min-instances 0 --max-instances 2`, zero paid SQL databases) |
+| **Runtime & Cloud Stack** | Python `3.12.7` / FastAPI, React 19 + Vite + Tailwind CSS (Firebase Hosting + Firebase Auth), **Google Cloud** (Cloud Run + Secret Manager; Cloud Firestore planned post-MVP), **NVIDIA NIM API** (`nvidia/nemotron-3-ultra-550b-a55b`) |
+| **Spend Policy** | Strictly **`$0` Free Tier** (`--min-instances 0 --max-instances 2`, zero SQL databases — no SQLAlchemy or Alembic) |
 
 > **GitHub Web Editor Tip:** Any teammate can view or edit this document directly in the browser without terminal commands by pressing `.` on the CanopyCrew GitHub repository page.
 
@@ -31,36 +31,41 @@ To guarantee biological accuracy, municipal legality, and zero cloud spend withi
 
 CanopyCrew combines **Google Cloud** serverless infrastructure and **NVIDIA NIM** generative inference while enforcing a hard architectural boundary between **deterministic botanical/cost logic** and **LLM narrative synthesis**:
 
-| Platform / Component | Product Feature Powered | Guardrail & `$0` Quota Limit |
-| :--- | :--- | :--- |
-| **Google Cloud Run** | Hosts the containerized Python `3.12.7` FastAPI backend (`recommender.py` botanical filtering, wire-safety enforcement, and seedling cost/canopy math) and static SPA delivery. | Serverless scale-to-zero (`--allow-unauthenticated --min-instances 0 --max-instances 2`); well within the **2 million requests/month** Free Tier. |
-| **Google Cloud Firestore** | Persists saved community `VolunteerPlanResponse` records and shared neighborhood care checklists without paid SQL instances. | Document-store Free Tier (**max 1 GiB storage**, 50k reads / 20k writes per day); zero paid SQL databases. |
-| **Google Secret Manager** | Injects `NVIDIA_API_KEY` into the Cloud Run runtime environment at container startup, isolating credentials from source code and `.env` files. | Managed by Idris (Cloud Cybersecurity); accessed via least-privilege IAM service account. |
-| **NVIDIA NIM API** | Synthesizes accessible, bilingual-friendly natural-language volunteer care narratives (`backend/app/agent/`) from validated species selections and site goals. | Strictly **read-only narrative synthesis**; never permitted to select species, override wire-safety rules, or compute cost/canopy totals. |
+| Platform / Component | Status | Product Feature Powered | Guardrail & `$0` Quota Limit |
+| :--- | :--- | :--- | :--- |
+| **Firebase Hosting & Firebase Auth** | **Deployed (Live MVP)** | Serves the React 19 + Vite + Tailwind CSS SPA (`https://canopycrew-sp-mvp.web.app/`) and handles account sign-in/sign-up (`firebase/auth`). Workspace selections and care checkoffs persist locally in browser `localStorage`. | Spark / Free Tier static hosting and email/password auth; zero backend database charges. |
+| **Google Cloud Run** | **Deployed (Live MVP)** | Hosts the hardened non-root (`USER appuser`) Python `3.12.7` FastAPI backend (`https://canopycrew-api-sb77peq6bq-uc.a.run.app`) running `recommender.py` botanical filtering, wire-safety enforcement, and seedling cost/canopy math. | Serverless scale-to-zero (`--allow-unauthenticated --min-instances 0 --max-instances 2`) in `us-central1` (`canopycrew-sp-mvp`); well within the **2 million requests/month** Always Free Tier. |
+| **Google Secret Manager** | **Deployed (Live MVP)** | Stores `canopycrew-nvidia-api-key` and injects `NVIDIA_API_KEY` into Cloud Run at container startup, isolating credentials from source code and `.env` files. | Managed with least-privilege runtime identity (`canopycrew-runtime`, zero static JSON keys). |
+| **NVIDIA NIM API** | **Deployed (Live MVP)** | Synthesizes accessible English volunteer care narratives with Brazilian Portuguese botanical names (`backend/app/agent/`, model `nvidia/nemotron-3-ultra-550b-a55b`) via `POST /api/v1/volunteer-plan/narrative`. | Strictly **read-only narrative synthesis** capped at `nim_daily_call_cap = 100`/day with deterministic English fallback; never selects species, overrides wire safety, or computes cost/canopy totals. |
+| **Google Cloud Firestore** | **Planned (Post-MVP)** | Designed for future cross-device persistence of saved community `VolunteerPlanResponse` records and shared neighborhood care checklists — **not wired in the live MVP yet**. | Document-store Free Tier (**max 1 GiB storage**, 50k reads / 20k writes per day); zero paid SQL databases. |
 
 ```mermaid
 flowchart LR
-    subgraph Client["Browser Client"]
-        UI["React + Vite UI<br/>(localhost:5173 / Cloud Run)"]
+    subgraph Client["Browser Client (Firebase Hosting)"]
+        UI["React 19 + Vite + Tailwind UI<br/>canopycrew-sp-mvp.web.app"]
+        FA["Firebase Auth<br/>(Sign-In / Sign-Up)"]
+        LS[("Browser localStorage<br/>Workspace Selections & Checkoffs")]
     end
 
-    subgraph GCP["Google Cloud Platform ($0 Free Tier)"]
-        CR["Cloud Run Service<br/>FastAPI (Python 3.12.7)<br/>min-instances: 0 | max-instances: 2"]
+    subgraph GCP["Google Cloud Platform — canopycrew-sp-mvp ($0 Free Tier)"]
+        CR["Cloud Run Service: canopycrew-api<br/>FastAPI (Python 3.12.7, USER appuser)<br/>min-instances: 0 | max-instances: 2"]
         DET["Deterministic Service Layer<br/>backend/app/services/recommender.py"]
         DATA["Validated Static Catalogs<br/>sites.json (3) & species.json (10)"]
         AGENT["Agent Narrative Adapter<br/>backend/app/agent/"]
-        FS[("Cloud Firestore<br/>Community Plans (<= 1 GiB)")]
-        GSM["Google Secret Manager<br/>NVIDIA_API_KEY"]
+        FS[("Cloud Firestore<br/>Planned Post-MVP (<= 1 GiB)")]
+        GSM["Google Secret Manager<br/>canopycrew-nvidia-api-key"]
     end
 
     subgraph NVIDIA["NVIDIA Accelerated Inference"]
-        NIM["NVIDIA NIM API<br/>Volunteer Care Narrative"]
+        NIM["NVIDIA NIM API<br/>nvidia/nemotron-3-ultra-550b-a55b"]
     end
 
-    UI -->|"GET /api/v1/sites & /species<br/>GET /api/v1/recommendations<br/>POST /api/v1/volunteer-plan"| CR
+    UI --> FA
+    UI --> LS
+    UI -->|"GET /api/v1/sites & /species<br/>GET /api/v1/recommendations<br/>POST /api/v1/volunteer-plan(/narrative)"| CR
     CR --> DET
     DET --> DATA
-    DET -.->|"Optional Plan Persistence"| FS
+    DET -.->|"Planned Post-MVP Persistence"| FS
     CR --> AGENT
     GSM -.->|"Runtime Env Injection"| AGENT
     AGENT -->|"Validated Plan Context"| NIM
@@ -123,7 +128,7 @@ backend/
 
 | Lane Owner | Role | Owned Directories & Deliverables | 4-Week Milestone Focus |
 | :--- | :--- | :--- | :--- |
-| **Alice** | Cloud Engineering | `backend/` (routes, schemas, services, core, data), `docs/ARCHITECTURE.md`, `docs/DATA_SCHEMA.md`, Cloud Run & Firestore | **W1:** Schemas & catalogs -> **W2:** Deterministic endpoints & unit tests -> **W3:** Cloud Run deployment -> **W4:** Load & reliability verification |
+| **Alice** | Cloud Engineering | `backend/` (routes, schemas, services, core, data), `docs/ARCHITECTURE.md`, `docs/DATA_SCHEMA.md`, Cloud Run & Firestore (Planned) | **W1:** Schemas & catalogs -> **W2:** Deterministic endpoints & unit tests -> **W3:** Cloud Run deployment -> **W4:** Load & reliability verification |
 | **Laurine** | AI Research / Lead | `frontend/` (React + Vite UI/UX), `backend/app/agent/` (NVIDIA NIM prompt templates) | **W1:** UI wireframes -> **W2:** Site selector & API integration -> **W3:** NVIDIA NIM care narrative integration -> **W4:** UX polish & demo flow |
 | **Barbara** | AI Cloud Leader | `docs/PRODUCT_BRIEF.md`, pitch narrative, UN SDG 11.7 impact metrics | **W1:** Problem grounding -> **W2:** Stakeholder & PMAU alignment -> **W3:** Impact metrics synthesis -> **W4:** Final capstone pitch deck |
 | **Idris** | Cloud Cybersecurity | GCP IAM, Google Secret Manager, CORS/input hardening, `docs/SECURITY.md` | **W1:** Secret hygiene baseline -> **W2:** IAM & Secret Manager setup -> **W3:** Cloud Run & CORS audit -> **W4:** Final security sign-off |
@@ -165,26 +170,27 @@ Deployments bind to `PORT` (injected automatically by Cloud Run as `8080`, mappe
 
 ```bash
 gcloud run deploy canopycrew-api \
-  --source ./backend \
-  --project canopycrew-sp-mvp \
-  --region us-central1 \
-  --platform managed \
-  --service-account canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com \
+  --source=./backend \
+  --project=canopycrew-sp-mvp \
+  --region=us-central1 \
+  --service-account=canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com \
   --allow-unauthenticated \
-  --min-instances 0 \
-  --max-instances 2 \
-  --memory 512Mi \
-  --cpu 1 \
-  --set-env-vars "APP_ENV=production,DEBUG=false" \
-  --set-secrets "NVIDIA_API_KEY=canopycrew-nvidia-api-key:latest"
+  --min-instances=0 \
+  --max-instances=2 \
+  --memory=512Mi \
+  --cpu=1 \
+  --set-env-vars="APP_ENV=production,DEBUG=false,NVIDIA_MODEL=nvidia/nemotron-3-ultra-550b-a55b" \
+  --set-secrets="NVIDIA_API_KEY=canopycrew-nvidia-api-key:latest" \
+  --quiet
 ```
 
 ### Isolated GCP Project & Least-Privilege Runtime Architecture
-- **Live Production URL:** `https://canopycrew-api-sb77peq6bq-uc.a.run.app`
+- **Live Production API URL:** `https://canopycrew-api-sb77peq6bq-uc.a.run.app` (verified live on revision **`canopycrew-api-00004-r7m`**, 2026-11-27)
+- **Live Production Frontend URL:** `https://canopycrew-sp-mvp.web.app/` (Firebase Hosting + Firebase Auth)
 - **Isolated Project Boundary:** `canopycrew-sp-mvp` (dedicated strictly to CanopyCrew MVP workloads, isolated from personal/external GCP projects).
 - **Always Free Tier Region:** `us-central1` (eligible for Google Cloud Run's Always Free quota of 2 million requests/month, 180,000 vCPU-seconds, and 360,000 GiB-seconds).
 - **Container Runtime Hardening:** `backend/Dockerfile` builds on `python:3.12-slim` and drops root privileges (`USER appuser`) prior to starting `uvicorn`.
-- **Service Account Separation:** Cloud Build executes image builds using its dedicated build service agent, while the running container executes under the least-privilege `canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` identity (which holds zero build or artifact-write permissions). See [`docs/SECURITY.md`](./SECURITY.md) for the complete IAM and security specification.
+- **Service Account Separation:** Builds execute separately from the running container, which executes exclusively under the least-privilege `canopycrew-runtime@canopycrew-sp-mvp.iam.gserviceaccount.com` identity (holding zero project-level IAM roles and zero user-managed JSON keys — only secret-scoped `roles/secretmanager.secretAccessor` on `canopycrew-nvidia-api-key`). See [`docs/SECURITY.md`](./SECURITY.md) for the complete IAM and live verification record.
 - **Health Probe:** `curl -s https://canopycrew-api-sb77peq6bq-uc.a.run.app/api/v1/health` -> `{"status":"healthy","app":"CanopyCrew API"}`
 
 > **Budget Guardrail:** Never increase `--min-instances` above `0`, never increase `--max-instances` above `2`, and never provision Cloud SQL or paid VPC connectors.
@@ -196,6 +202,7 @@ gcloud run deploy canopycrew-api \
 ### Option A: Zero-Install Browser Setup (GitHub Codespaces)
 1. Click **Code -> Codespaces -> Create codespace on `main`** (or your feature branch).
 2. `.devcontainer/devcontainer.json` automatically provisions **Python 3.12** + **Node.js 22**, installs `frontend` npm packages and `backend/requirements.txt`, and forwards ports `8000` (FastAPI) and `5173` (Vite).
+3. In the Codespaces **Ports** tab, set forwarded port `8000` to **Public**, pass `CORS_ORIGINS="https://<your-codespace>-5173.app.github.dev"` when starting `uvicorn`, and set `VITE_API_BASE_URL=https://<your-codespace>-8000.app.github.dev/api/v1` in `frontend/.env.local`.
 
 ### Option B: Step-by-Step CLI Verification
 Run the deterministic test suite and verify live endpoints from the repository root:

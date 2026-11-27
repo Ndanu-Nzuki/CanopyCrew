@@ -119,5 +119,17 @@ Shared chronological log of pull requests, architectural decisions, cross-lane u
   - **Product Brief (`@Barbara`):** Strengthens GCLP x MMC rubric Pillar 3 & Pillar 4 with verified defense-in-depth perimeter controls and daily NVIDIA NIM quota protection (`nim_daily_call_cap=100`).
 - **Verification:** `pytest -v` (`32 passed` across `test_health.py`, `test_endpoints.py`, and `test_agent.py`, including hostile `.run.app` CORS rejection, `422` length-bound validation, OWASP header assertions, and daily NIM cap fallback).
 
+### [2026-11-27] — PR #24 README Verification, Cloud Run Redeploy (`00004-r7m`), and Architecture/Security Doc Sync (`docs/docs-sync-deployed-architecture`)
+- **Author / Lane:** Alice Severi Gonçalves (Cloud Engineering & Cloud Cybersecurity coverage)
+- **Changes Delivered:**
+  - Proofread Barbara's submission README PR (#24, `docs/submission-readme`) and pushed follow-up commits adding the live Cloud Run URL, exact GCP Free Tier / NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`, daily cap `100`) details, Codespaces CORS & Public port `8000` setup steps, Python `.venv` / Node `22+` guidance, Cloud Security ownership coverage, and GitHub Markdown spacing fixes while preserving Laurine's walkthrough placeholder.
+  - Redeployed `main` (PR #21 security hardening) to Google Cloud Run revision **`canopycrew-api-00004-r7m`** (`us-central1`, `canopycrew-sp-mvp`, `canopycrew-runtime` SA, `--min-instances=0 --max-instances=2`, `APP_ENV=production`, `DEBUG=false`, `NVIDIA_MODEL=nvidia/nemotron-3-ultra-550b-a55b`, Secret Manager `canopycrew-nvidia-api-key:latest`).
+  - Synced `docs/ARCHITECTURE.md`, `docs/DATA_SCHEMA.md`, and `docs/SECURITY.md` to clearly distinguish **Deployed (Live MVP)** from **Planned (Post-MVP)** (Firestore), completed all Section 7.5 live GCP IAM / Secret Manager / zero-SA-keys / full Git-history secret audits, recorded Section 7.7 live black-box verification for revision `canopycrew-api-00004-r7m`, and completed Section 7.6 MVP security sign-off under Cloud Engineering & Cloud Cybersecurity coverage.
+- **Cross-Lane Unblocks:**
+  - **Product Brief (`@Barbara`):** Unblocks PR #24 (`docs/submission-readme`) and aligns every linked engineering document with the submission deck and 3-page summary.
+  - **Frontend (`@Laurine`):** Preserves the exact `"Link pending — recording in progress."` placeholder on `docs/submission-readme` for her walkthrough video edit and keeps Firebase Hosting origins allowlisted on live Cloud Run.
+  - **Security:** Closes the Section 7.6 re-review trigger and Section 7.5 audit items with live GCP and Git history verification evidence, elevating `docs/SECURITY.md` to **APPROVED FOR MVP SUBMISSION (2026-11-27)**.
+- **Verification:** Live `curl` probes against `https://canopycrew-api-sb77peq6bq-uc.a.run.app` (`canopycrew-api-00004-r7m`) plus read-only `gcloud` IAM/Secret/Key audits (`0` project-level roles on `canopycrew-runtime`, secret-scoped `secretAccessor` on `canopycrew-nvidia-api-key` `versions/1`, `[]` user-managed SA keys) and full Git history secret scan (`0` real credentials or `.env` files).
+
 
 

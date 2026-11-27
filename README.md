@@ -121,7 +121,7 @@ The next priorities are to verify that generated guides cover every care period 
 ## Project team
 
 - **Laurine Ndanu Nzuki — AI Research & Frontend.** Led frontend development, user experience, and AI research.
-- **Alice Severi Gonçalves — Cloud Engineering & Backend.** Led backend development, ecological data integration, recommendation logic, and Cloud Run deployment.
+- **Alice Severi Gonçalves — Cloud Engineering, Backend & Cloud Security.** Led backend development, ecological data integration, recommendation logic, Cloud Run deployment, and cloud security hardening & sign-off.
 - **Barbara Roberto Mulu — Product Narrative Lead & AI Cloud Leader.** Led the product narrative, product brief, volunteer journey, SDG alignment, and presentation storytelling.
 - **Idris Belgore Abiodun — Cloud Cybersecurity.** Supported security review, access controls, and secure cloud development.
 
